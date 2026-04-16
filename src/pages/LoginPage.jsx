@@ -1,7 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../context/AuthContext'
 
 export default function LoginPage() {
+  const { user, loading: authLoading } = useAuth()
+  const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -10,13 +14,21 @@ export default function LoginPage() {
   const [mode, setMode] = useState('login') // 'login' | 'reset'
   const [resetSent, setResetSent] = useState(false)
 
+  // If already authenticated, redirect to app immediately
+  useEffect(() => {
+    if (!authLoading && user) navigate('/', { replace: true })
+  }, [user, authLoading, navigate])
+
   async function handleLogin(e) {
     e.preventDefault()
     setError('')
     setLoading(true)
     const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) setError(error.message)
-    setLoading(false)
+    if (error) {
+      setError(error.message)
+      setLoading(false)
+    }
+    // On success: onAuthStateChange fires → user state updates → useEffect above redirects
   }
 
   async function handleReset(e) {
