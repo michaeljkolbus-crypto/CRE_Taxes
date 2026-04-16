@@ -608,3 +608,4 @@ export function PropertiesPage() {
     </div>
   )
 }
+export default PropertiesPage
