@@ -18,6 +18,12 @@ import { useState, useRef, useEffect } from 'react'
  *  - viewMode: 'list'|'icon'|'map'   (optional, for Properties)
  *  - onViewChange: (mode) => void    (optional)
  *  - showViewToggle: bool
+ *  ── Saved list views ─────────────────────────────────────────────────────
+ *  - savedViews: [{id, name}]        (optional)
+ *  - activeViewId: string|null       (optional)
+ *  - onLoadView: (id, config) => void (optional)
+ *  - onSaveView: (name) => Promise   (optional)  — saves current columns
+ *  - onDeleteView: (id) => void      (optional)
  */
 export default function RecordToolbar({
   title, count,
@@ -27,17 +33,29 @@ export default function RecordToolbar({
   selectedIds = [],
   massReplaceFields = [], onMassReplace,
   viewMode, onViewChange, showViewToggle = false,
+  // saved views
+  savedViews = [], activeViewId = null,
+  onLoadView, onSaveView, onDeleteView,
 }) {
-  const [showColumns, setShowColumns] = useState(false)
+  const [showColumns, setShowColumns]       = useState(false)
   const [showMassReplace, setShowMassReplace] = useState(false)
-  const [mrField, setMrField] = useState('')
-  const [mrValue, setMrValue] = useState('')
+  const [mrField, setMrField]               = useState('')
+  const [mrValue, setMrValue]               = useState('')
+
+  // Saved-view UI state (lives inside the columns panel)
+  const [showSaveInput, setShowSaveInput]   = useState(false)
+  const [saveName, setSaveName]             = useState('')
+  const [saving, setSaving]                 = useState(false)
 
   const columnsRef = useRef(null)
 
   useEffect(() => {
     function handleClick(e) {
-      if (columnsRef.current && !columnsRef.current.contains(e.target)) setShowColumns(false)
+      if (columnsRef.current && !columnsRef.current.contains(e.target)) {
+        setShowColumns(false)
+        setShowSaveInput(false)
+        setSaveName('')
+      }
     }
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
@@ -56,14 +74,32 @@ export default function RecordToolbar({
     setMrValue('')
   }
 
+  async function handleSaveView() {
+    if (!saveName.trim() || !onSaveView) return
+    setSaving(true)
+    await onSaveView(saveName.trim())
+    setSaving(false)
+    setSaveName('')
+    setShowSaveInput(false)
+  }
+
   const mrFieldDef = massReplaceFields.find(f => f.key === mrField)
+  const activeView = savedViews.find(v => v.id === activeViewId)
 
   return (
     <div style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', padding: '14px 24px' }}>
       {/* Top row: title + action buttons */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <div>
-          <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', margin: 0 }}>{title}</h2>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+            <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', margin: 0 }}>{title}</h2>
+            {/* Active view badge */}
+            {activeView && (
+              <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 12, background: '#eff6ff', color: '#1e40af', fontWeight: 600, border: '1px solid #bfdbfe' }}>
+                {activeView.name}
+              </span>
+            )}
+          </div>
           {count != null && (
             <p style={{ fontSize: 12, color: '#64748b', margin: '2px 0 0 0' }}>
               {count.toLocaleString()} record{count !== 1 ? 's' : ''}
@@ -111,7 +147,7 @@ export default function RecordToolbar({
             <ToolbarBtn icon={exportIcon} label="Export" onClick={onExport} />
           )}
 
-          {/* Columns picker */}
+          {/* Columns picker + saved views */}
           {columns.length > 0 && (
             <div ref={columnsRef} style={{ position: 'relative' }}>
               <ToolbarBtn icon={columnsIcon} label="Columns" onClick={() => setShowColumns(!showColumns)} active={showColumns} />
@@ -119,8 +155,11 @@ export default function RecordToolbar({
                 <div style={{
                   position: 'absolute', top: 'calc(100% + 6px)', right: 0,
                   background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10,
-                  padding: 12, minWidth: 200, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 200
+                  padding: 12, minWidth: 220, maxHeight: '70vh', overflowY: 'auto',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 200
                 }}>
+
+                  {/* Column toggles */}
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
                     Show / Hide Columns
                   </div>
@@ -138,6 +177,93 @@ export default function RecordToolbar({
                       {col.label}
                     </label>
                   ))}
+
+                  {/* Saved Views section */}
+                  {(onSaveView || savedViews.length > 0) && (
+                    <div style={{ marginTop: 14, borderTop: '1px solid #f1f5f9', paddingTop: 12 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+                        Saved Views
+                      </div>
+
+                      {/* List of saved views */}
+                      {savedViews.length === 0 && (
+                        <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic', marginBottom: 8 }}>No saved views yet</div>
+                      )}
+                      {savedViews.map(v => (
+                        <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0' }}>
+                          <button
+                            onClick={() => { onLoadView?.(v.id, v.config); setShowColumns(false) }}
+                            style={{
+                              flex: 1, textAlign: 'left', background: 'none', border: 'none',
+                              fontSize: 13, cursor: 'pointer', padding: '3px 6px', borderRadius: 5,
+                              color: activeViewId === v.id ? '#1e40af' : '#1e293b',
+                              fontWeight: activeViewId === v.id ? 700 : 400,
+                              background: activeViewId === v.id ? '#eff6ff' : 'transparent',
+                            }}
+                          >
+                            {v.name}
+                          </button>
+                          {onDeleteView && (
+                            <button
+                              onClick={() => onDeleteView(v.id)}
+                              title="Delete view"
+                              style={{ background: 'none', border: 'none', color: '#cbd5e1', cursor: 'pointer', fontSize: 14, fontWeight: 700, padding: '0 3px', lineHeight: 1 }}
+                              onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
+                              onMouseLeave={e => e.currentTarget.style.color = '#cbd5e1'}
+                            >✕</button>
+                          )}
+                        </div>
+                      ))}
+
+                      {/* Save current view as... */}
+                      {onSaveView && (
+                        <div style={{ marginTop: 8 }}>
+                          {showSaveInput ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              <input
+                                autoFocus
+                                value={saveName}
+                                onChange={e => setSaveName(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && handleSaveView()}
+                                placeholder="View name…"
+                                style={{ padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 12, outline: 'none' }}
+                              />
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                <button
+                                  onClick={handleSaveView}
+                                  disabled={saving || !saveName.trim()}
+                                  style={{ flex: 1, padding: '5px 8px', background: '#1e40af', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}
+                                >
+                                  {saving ? '...' : 'Save'}
+                                </button>
+                                <button
+                                  onClick={() => { setShowSaveInput(false); setSaveName('') }}
+                                  style={{ padding: '5px 8px', border: '1px solid #e2e8f0', borderRadius: 6, background: '#fff', color: '#64748b', fontSize: 12, cursor: 'pointer' }}
+                                >Cancel</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setShowSaveInput(true)}
+                              style={{ width: '100%', padding: '6px 8px', border: '1px dashed #93c5fd', borderRadius: 6, background: 'transparent', color: '#1e40af', fontSize: 12, fontWeight: 500, cursor: 'pointer', textAlign: 'left' }}
+                            >
+                              + Save current view…
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Default / reset */}
+                      {activeViewId && onLoadView && (
+                        <button
+                          onClick={() => { onLoadView(null, null); setShowColumns(false) }}
+                          style={{ marginTop: 6, width: '100%', padding: '5px 8px', border: '1px solid #e2e8f0', borderRadius: 6, background: '#fff', color: '#64748b', fontSize: 12, cursor: 'pointer', textAlign: 'left' }}
+                        >
+                          ↩ Reset to default
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

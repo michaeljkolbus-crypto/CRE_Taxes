@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { fmt } from '../../lib/theme'
 import RecordToolbar from '../../components/shared/RecordToolbar'
+import { useViewPreferences } from '../../hooks/useViewPreferences'
 
 const APPEAL_PROP_TYPES = ['Commercial', 'Industrial', 'Duplex', 'Residential', 'Farmland']
 
@@ -288,6 +289,44 @@ export function PropertiesPage() {
   const [viewMode, setViewMode] = useState('list')
   const [columns, setColumns] = useState(ALL_COLUMNS)
   const [selectedIds, setSelectedIds] = useState([])
+  const [activeViewId, setActiveViewId] = useState(null)
+
+  // ── Saved list views ────────────────────────────────────────────────────
+  const { views: savedViews, saveView, deleteView } = useViewPreferences('property_list')
+
+  const handleLoadView = useCallback((viewId, config) => {
+    setActiveViewId(viewId)
+    if (config?.columns) {
+      // Merge saved column visibility into ALL_COLUMNS (preserves any new cols added later)
+      const configMap = Object.fromEntries(config.columns.map(c => [c.key, c]))
+      // Reorder by saved order first, then append any columns not in the saved config
+      const savedKeys = config.columns.map(c => c.key)
+      const reordered = [
+        ...config.columns.map(saved => {
+          const base = ALL_COLUMNS.find(a => a.key === saved.key)
+          return base ? { ...base, visible: saved.visible !== false } : null
+        }).filter(Boolean),
+        ...ALL_COLUMNS.filter(a => !savedKeys.includes(a.key)).map(a => ({ ...a, visible: false }))
+      ]
+      setColumns(reordered)
+    } else {
+      setColumns(ALL_COLUMNS)
+    }
+  }, [])
+
+  const handleSaveView = useCallback(async (name) => {
+    const config = { columns: columns.map(c => ({ key: c.key, visible: c.visible !== false })) }
+    const result = await saveView(name, config)
+    if (result) setActiveViewId(result.id)
+  }, [columns, saveView])
+
+  const handleDeleteView = useCallback(async (viewId) => {
+    await deleteView(viewId)
+    if (activeViewId === viewId) {
+      setActiveViewId(null)
+      setColumns(ALL_COLUMNS)
+    }
+  }, [activeViewId, deleteView])
 
   const pageSize = 50
 
@@ -376,13 +415,18 @@ export function PropertiesPage() {
         addLabel="+ Add Property"
         onExport={handleExport}
         columns={columns}
-        onColumnsChange={setColumns}
+        onColumnsChange={(updated) => { setColumns(updated); setActiveViewId(null) }}
         selectedIds={selectedIds}
         massReplaceFields={MASS_REPLACE_FIELDS}
         onMassReplace={handleMassReplace}
         showViewToggle
         viewMode={viewMode}
         onViewChange={setViewMode}
+        savedViews={savedViews}
+        activeViewId={activeViewId}
+        onLoadView={handleLoadView}
+        onSaveView={handleSaveView}
+        onDeleteView={handleDeleteView}
       />
 
       {/* Filter bar */}

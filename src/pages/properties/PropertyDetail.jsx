@@ -1,9 +1,21 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import { fmt } from '../../lib/theme'
 import { PhotoGallery } from '../../components/shared/PhotoGallery'
+import { useViewPreferences } from '../../hooks/useViewPreferences'
+
+// ── All available tabs (canonical list — never includes Notes as a tab) ──────
+const ALL_TABS = [
+  { id: 'Overview',               label: 'Overview' },
+  { id: 'Tax & Assessment',       label: 'Tax & Assessment' },
+  { id: 'Residential',            label: 'Residential' },
+  { id: 'Industrial & Multifamily', label: 'Industrial & Multifamily' },
+  { id: 'Contacts',               label: 'Contacts' },
+  { id: 'Appeals',                label: 'Appeals' },
+]
+const DEFAULT_TAB_CONFIG = ALL_TABS.map(t => ({ ...t, visible: true }))
 
 // ── Field edit row ──────────────────────────────────────────────────────────
 function FieldRow({ label, value, editing, type = 'text', onChange, options }) {
@@ -325,6 +337,238 @@ function HeaderField({ label, value, editing, onChange, type = 'text', options, 
   )
 }
 
+// ── Edit Layout Modal ───────────────────────────────────────────────────────
+function EditLayoutModal({ tabConfig, views, onClose, onApply, onSaveView, onDeleteView }) {
+  const [localConfig, setLocalConfig] = useState(tabConfig.map(t => ({ ...t })))
+  const [showSaveInput, setShowSaveInput] = useState(false)
+  const [saveName, setSaveName]         = useState('')
+  const [saving, setSaving]             = useState(false)
+  const [saveError, setSaveError]       = useState('')
+
+  const toggleVisible = (id) => {
+    setLocalConfig(prev => prev.map(t => t.id === id ? { ...t, visible: !t.visible } : t))
+  }
+
+  const move = (idx, dir) => {
+    const next = idx + dir
+    if (next < 0 || next >= localConfig.length) return
+    const arr = [...localConfig]
+    ;[arr[idx], arr[next]] = [arr[next], arr[idx]]
+    setLocalConfig(arr)
+  }
+
+  const handleSave = async () => {
+    if (!saveName.trim()) { setSaveError('Please enter a name.'); return }
+    setSaving(true)
+    setSaveError('')
+    const result = await onSaveView(saveName.trim(), { tabs: localConfig })
+    setSaving(false)
+    if (result) {
+      setSaveName('')
+      setShowSaveInput(false)
+    } else {
+      setSaveError('Could not save — please try again.')
+    }
+  }
+
+  const btn = (label, onClick, opts = {}) => (
+    <button
+      onClick={onClick}
+      style={{
+        padding: opts.small ? '4px 8px' : '7px 14px',
+        border: opts.primary ? 'none' : '1px solid #e2e8f0',
+        background: opts.primary ? '#1e40af' : opts.danger ? '#fff' : '#fff',
+        color: opts.primary ? '#fff' : opts.danger ? '#ef4444' : '#1e293b',
+        borderRadius: 7, fontSize: opts.small ? 11 : 13, fontWeight: 600,
+        cursor: 'pointer', ...opts.style
+      }}
+    >
+      {label}
+    </button>
+  )
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300 }}>
+      <div style={{ background: '#fff', borderRadius: 14, padding: '28px 28px 24px', width: 420, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 24px 60px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', gap: 0 }}>
+
+        <h3 style={{ fontSize: 17, fontWeight: 700, color: '#1e293b', margin: '0 0 4px 0' }}>Edit Layout</h3>
+        <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 20px 0' }}>Show, hide, or reorder tabs. Save as a named view to reuse later.</p>
+
+        {/* Tab list */}
+        <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden', marginBottom: 20 }}>
+          {localConfig.map((tab, idx) => (
+            <div key={tab.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: tab.visible !== false ? '#fff' : '#f8fafc', borderBottom: idx < localConfig.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+              {/* Drag handle visual */}
+              <span style={{ color: '#cbd5e1', fontSize: 14, cursor: 'default', userSelect: 'none' }}>⠿</span>
+
+              {/* Visibility toggle */}
+              <input
+                type="checkbox"
+                checked={tab.visible !== false}
+                onChange={() => toggleVisible(tab.id)}
+                style={{ accentColor: '#1e40af', cursor: 'pointer', width: 15, height: 15 }}
+              />
+
+              {/* Tab name */}
+              <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: tab.visible !== false ? '#1e293b' : '#94a3b8' }}>
+                {tab.label || tab.id}
+              </span>
+
+              {/* Reorder buttons */}
+              <div style={{ display: 'flex', gap: 4 }}>
+                <button
+                  onClick={() => move(idx, -1)}
+                  disabled={idx === 0}
+                  title="Move up"
+                  style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: 5, padding: '2px 6px', fontSize: 11, cursor: idx === 0 ? 'not-allowed' : 'pointer', color: idx === 0 ? '#cbd5e1' : '#475569' }}
+                >↑</button>
+                <button
+                  onClick={() => move(idx, 1)}
+                  disabled={idx === localConfig.length - 1}
+                  title="Move down"
+                  style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: 5, padding: '2px 6px', fontSize: 11, cursor: idx === localConfig.length - 1 ? 'not-allowed' : 'pointer', color: idx === localConfig.length - 1 ? '#cbd5e1' : '#475569' }}
+                >↓</button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Saved views list */}
+        {views.length > 0 && (
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Saved Views</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {views.map(v => (
+                <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: '#f8fafc', borderRadius: 7, border: '1px solid #e2e8f0' }}>
+                  <span style={{ flex: 1, fontSize: 13, color: '#1e293b' }}>{v.name}</span>
+                  <button
+                    onClick={() => onDeleteView(v.id)}
+                    style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 14, fontWeight: 700, padding: '0 2px' }}
+                    title="Delete view"
+                  >✕</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Save as view */}
+        <div style={{ marginBottom: 22, borderTop: '1px solid #f1f5f9', paddingTop: 16 }}>
+          {showSaveInput ? (
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>Save current layout as:</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  autoFocus
+                  value={saveName}
+                  onChange={e => setSaveName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleSave()}
+                  placeholder="e.g. Industrial View"
+                  style={{ flex: 1, padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13, outline: 'none' }}
+                />
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  style={{ padding: '7px 14px', background: '#1e40af', color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.6 : 1 }}
+                >
+                  {saving ? '...' : 'Save'}
+                </button>
+                <button
+                  onClick={() => { setShowSaveInput(false); setSaveName(''); setSaveError('') }}
+                  style={{ padding: '7px 10px', border: '1px solid #e2e8f0', borderRadius: 7, background: '#fff', color: '#64748b', fontSize: 13, cursor: 'pointer' }}
+                >✕</button>
+              </div>
+              {saveError && <div style={{ fontSize: 12, color: '#dc2626', marginTop: 5 }}>{saveError}</div>}
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowSaveInput(true)}
+              style={{ fontSize: 13, color: '#1e40af', background: 'none', border: '1px dashed #93c5fd', borderRadius: 7, padding: '6px 14px', cursor: 'pointer', fontWeight: 500 }}
+            >
+              💾 Save as named view…
+            </button>
+          )}
+        </div>
+
+        {/* Action buttons */}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          {btn('Cancel', onClose)}
+          <button
+            onClick={() => { onApply(localConfig); onClose() }}
+            style={{ padding: '7px 18px', background: '#1e40af', color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+          >
+            Apply Layout
+          </button>
+        </div>
+
+      </div>
+    </div>
+  )
+}
+
+// ── Views Bar (above tab strip) ─────────────────────────────────────────────
+function ViewsBar({ views, activeViewId, onLoadView, onEditLayout }) {
+  const [open, setOpen] = useState(false)
+  const activeView = views.find(v => v.id === activeViewId)
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+      {/* Left: saved views selector */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>View</span>
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => setOpen(o => !o)}
+            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', border: '1px solid #e2e8f0', borderRadius: 7, background: activeViewId ? '#eff6ff' : '#fff', color: activeViewId ? '#1e40af' : '#475569', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+          >
+            {activeView ? activeView.name : 'Default'}
+            <span style={{ fontSize: 10, opacity: 0.6 }}>▾</span>
+          </button>
+          {open && (
+            <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 9, padding: 6, minWidth: 180, boxShadow: '0 8px 24px rgba(0,0,0,0.10)', zIndex: 100 }}>
+              <div
+                onClick={() => { onLoadView(null); setOpen(false) }}
+                style={{ padding: '6px 10px', borderRadius: 6, fontSize: 13, cursor: 'pointer', fontWeight: activeViewId == null ? 700 : 400, color: activeViewId == null ? '#1e40af' : '#1e293b', background: activeViewId == null ? '#eff6ff' : 'transparent' }}
+                onMouseEnter={e => e.currentTarget.style.background = activeViewId == null ? '#eff6ff' : '#f8fafc'}
+                onMouseLeave={e => e.currentTarget.style.background = activeViewId == null ? '#eff6ff' : 'transparent'}
+              >
+                Default
+              </div>
+              {views.map(v => (
+                <div
+                  key={v.id}
+                  onClick={() => { onLoadView(v.id, v.config); setOpen(false) }}
+                  style={{ padding: '6px 10px', borderRadius: 6, fontSize: 13, cursor: 'pointer', fontWeight: activeViewId === v.id ? 700 : 400, color: activeViewId === v.id ? '#1e40af' : '#1e293b', background: activeViewId === v.id ? '#eff6ff' : 'transparent' }}
+                  onMouseEnter={e => e.currentTarget.style.background = activeViewId === v.id ? '#eff6ff' : '#f8fafc'}
+                  onMouseLeave={e => e.currentTarget.style.background = activeViewId === v.id ? '#eff6ff' : 'transparent'}
+                >
+                  {v.name}
+                </div>
+              ))}
+              {views.length === 0 && (
+                <div style={{ padding: '6px 10px', fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>No saved views yet</div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Right: Edit Layout button */}
+      <button
+        onClick={onEditLayout}
+        style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', border: '1px solid #e2e8f0', borderRadius: 7, background: '#fff', color: '#475569', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
+          <line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/>
+          <line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+        </svg>
+        Edit Layout
+      </button>
+    </div>
+  )
+}
+
 // ── Main Component ──────────────────────────────────────────────────────────
 export function PropertyDetail() {
   const { id } = useParams()
@@ -339,7 +583,24 @@ export function PropertyDetail() {
   const [activeTab, setActiveTab] = useState('Overview')
   const [primaryContact, setPrimaryContact] = useState(null)
 
+  // ── Layout / Views state ──────────────────────────────────────────────────
+  const [tabConfig, setTabConfig]       = useState(DEFAULT_TAB_CONFIG)
+  const [activeViewId, setActiveViewId] = useState(null)
+  const [showLayoutModal, setShowLayoutModal] = useState(false)
+
+  const { views, saveView, deleteView } = useViewPreferences('property_detail')
+
   const isAdmin = user?.role === 'admin'
+
+  // Visible tabs in current order (at least one must always be visible)
+  const visibleTabs = tabConfig.filter(t => t.visible !== false)
+
+  // Ensure activeTab stays valid if layout changes
+  useEffect(() => {
+    if (!visibleTabs.find(t => t.id === activeTab) && visibleTabs.length > 0) {
+      setActiveTab(visibleTabs[0].id)
+    }
+  }, [tabConfig])
 
   useEffect(() => { fetchProperty() }, [id])
 
@@ -350,7 +611,6 @@ export function PropertyDetail() {
       if (error) throw error
       setProperty(data)
       setForm(data)
-      // Prefer the primary contact; fall back to the first linked contact
       const { data: allPc } = await supabase
         .from('property_contacts')
         .select('*, contact:contacts(id, first_name, last_name, email_address, main_phone, company_id, company:companies(id, company_name))')
@@ -362,6 +622,26 @@ export function PropertyDetail() {
       console.error('Error fetching property:', err)
       navigate('/properties')
     } finally { setLoading(false) }
+  }
+
+  // Load a saved view by id
+  const handleLoadView = (viewId, config) => {
+    setActiveViewId(viewId)
+    if (config?.tabs) {
+      // Merge with ALL_TABS to ensure any new tabs added later are included
+      const configMap = Object.fromEntries(config.tabs.map(t => [t.id, t]))
+      const merged = config.tabs.map(t => ({
+        ...ALL_TABS.find(a => a.id === t.id) || t,
+        visible: t.visible !== false,
+      }))
+      // Add any tabs not in the saved config (new tabs added after view was saved)
+      ALL_TABS.forEach(a => {
+        if (!merged.find(m => m.id === a.id)) merged.push({ ...a, visible: true })
+      })
+      setTabConfig(merged)
+    } else {
+      setTabConfig(DEFAULT_TAB_CONFIG)
+    }
   }
 
   // ── Calculated values (derived live from form) ──────────────────────────
@@ -395,7 +675,6 @@ export function PropertyDetail() {
       delete updateData.full_name
       delete updateData.created_at
       delete updateData.updated_at
-      // Persist calculated values to DB
       updateData.total_units = calcTotalUnits || null
       updateData.sales_price_per_sqft = calcSalePricePerSqft
       updateData.bldg_assessment_per_sqft = calcBldgAssessmentPerSqft
@@ -437,7 +716,6 @@ export function PropertyDetail() {
   const fullAddress = addressParts.join(', ')
   const mapsAddress = encodeURIComponent(fullAddress || form.property_name || '')
 
-  const tabs = ['Overview', 'Tax & Assessment', 'Residential', 'Industrial & Multifamily', 'Contacts', 'Appeals', 'Notes']
   const grid2col = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px 32px', marginBottom: '24px' }
 
   // ── Section header rendered inside the 2-col grid (spans full width) ──────
@@ -514,6 +792,12 @@ export function PropertyDetail() {
             <FieldRow label="Parcel ID 4" value={form.parcel_id4} editing={editing} onChange={v => f('parcel_id4', v)} />
             <FieldRow label="Parcel ID 5" value={form.parcel_id5} editing={editing} onChange={v => f('parcel_id5', v)} />
             <FieldRow label="Misc Parcels" value={form.misc_parcels} editing={editing} onChange={v => f('misc_parcels', v)} />
+
+            {/* ── Notes (moved from its own tab) ── */}
+            <SH title="Notes" />
+            <div style={{ gridColumn: '1 / -1' }}>
+              <FieldRow label="Notes" value={form.notes} editing={editing} type="textarea" onChange={v => f('notes', v)} />
+            </div>
 
           </div>
         )
@@ -606,14 +890,6 @@ export function PropertyDetail() {
           </div>
         )
 
-      // ── NOTES ─────────────────────────────────────────────────────────────
-      case 'Notes':
-        return (
-          <div>
-            <FieldRow label="Notes" value={form.notes} editing={editing} type="textarea" onChange={v => f('notes', v)} />
-          </div>
-        )
-
       default:
         return null
     }
@@ -682,7 +958,6 @@ export function PropertyDetail() {
             {/* Row 2: Name + Address + Owner | Photo + Map */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                {/* Property Name — editable when in edit mode */}
                 {editing ? (
                   <div style={{ marginBottom: 8 }}>
                     <HeaderField
@@ -699,7 +974,6 @@ export function PropertyDetail() {
                   </h1>
                 )}
 
-                {/* Address — editable inline when editing */}
                 {editing ? (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 12px', marginBottom: 10 }}>
                     <HeaderField label="Street Address" value={form.address} editing={editing} onChange={v => f('address', v)} inputStyle={{ width: '100%', boxSizing: 'border-box' }} />
@@ -720,7 +994,6 @@ export function PropertyDetail() {
                   </>
                 )}
 
-                {/* Owner Contact + Company — directly under address */}
                 {primaryContact && (
                   <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 10, marginTop: 4, display: 'flex', flexDirection: 'column', gap: 5 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -800,31 +1073,56 @@ export function PropertyDetail() {
 
         {/* ── Detail Tabs (full width — no sidebar) ────────────────────────── */}
         <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '20px 24px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+
+          {/* Views bar */}
+          <ViewsBar
+            views={views}
+            activeViewId={activeViewId}
+            onLoadView={handleLoadView}
+            onEditLayout={() => setShowLayoutModal(true)}
+          />
+
           {/* Tab bar */}
           <div style={{ display: 'flex', gap: '2px', borderBottom: '1px solid #e2e8f0', marginBottom: '24px', flexWrap: 'wrap' }}>
-            {tabs.map(tab => (
+            {visibleTabs.map(tab => (
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
                 style={{
                   background: 'none', border: 'none',
                   padding: '9px 12px', marginBottom: '-1px',
-                  borderBottom: activeTab === tab ? '2px solid #1e40af' : '2px solid transparent',
-                  color: activeTab === tab ? '#1e40af' : '#64748b',
+                  borderBottom: activeTab === tab.id ? '2px solid #1e40af' : '2px solid transparent',
+                  color: activeTab === tab.id ? '#1e40af' : '#64748b',
                   fontSize: 12, fontWeight: 600, cursor: 'pointer',
                   borderRadius: '4px 4px 0 0',
                   transition: 'color 0.15s',
                   whiteSpace: 'nowrap'
                 }}
               >
-                {tab}
+                {tab.label}
               </button>
             ))}
           </div>
+
           <TabContent />
         </div>
 
       </div>
+
+      {/* ── Edit Layout Modal ─────────────────────────────────────────────── */}
+      {showLayoutModal && (
+        <EditLayoutModal
+          tabConfig={tabConfig}
+          views={views}
+          onClose={() => setShowLayoutModal(false)}
+          onApply={(newConfig) => {
+            setTabConfig(newConfig)
+            setActiveViewId(null) // layout is now unsaved / customized
+          }}
+          onSaveView={saveView}
+          onDeleteView={deleteView}
+        />
+      )}
     </div>
   )
 }
