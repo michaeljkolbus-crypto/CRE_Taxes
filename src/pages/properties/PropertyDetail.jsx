@@ -305,11 +305,11 @@ function AppealsPanel({ propertyId }) {
 
 // ── Stat Cell ───────────────────────────────────────────────────────────────
 function StatCell({ label, value, color }) {
-  if (!value && value !== 0) return null
+  const display = (value !== null && value !== undefined && value !== '') ? value : '—'
   return (
     <div style={{ padding: '6px 16px 6px 0' }}>
       <p style={{ margin: 0, fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</p>
-      <p style={{ margin: '3px 0 0', fontSize: 15, fontWeight: 700, color: color || '#1e293b' }}>{value}</p>
+      <p style={{ margin: '3px 0 0', fontSize: 15, fontWeight: 700, color: display === '—' ? '#cbd5e1' : (color || '#1e293b') }}>{display}</p>
     </div>
   )
 }
@@ -1079,11 +1079,11 @@ export function PropertyDetail() {
                 <StatCell label="Property Type"    value={form.property_type} />
                 <StatCell label="Property Subtype" value={form.property_subtype} />
                 <StatCell label="Parcel ID"         value={form.parcel_id} />
-                <StatCell label="Total Bldg SF"     value={form.total_building_sqft ? fmt.number(form.total_building_sqft) + ' SF' : null} color="#1e40af" />
-                <StatCell label="Total Units"       value={calcTotalUnits > 0 ? calcTotalUnits : null} />
-                <StatCell label="Year Built / Reno" value={[form.year_built, form.year_renovated].filter(Boolean).join(' / ') || null} />
-                <StatCell label="Last Sale Price"   value={form.sales_price ? fmt.currency(form.sales_price) : null} color="#f59e0b" />
-                <StatCell label="Last Sale Date"    value={form.sale_date ? fmt.date(form.sale_date) : null} />
+                <StatCell label="Total Bldg SF"     value={form.total_building_sqft ? fmt.number(form.total_building_sqft) + ' SF' : ''} color="#1e40af" />
+                <StatCell label="Total Units"       value={calcTotalUnits > 0 ? calcTotalUnits : ''} />
+                <StatCell label="Year Built / Reno" value={[form.year_built, form.year_renovated].filter(Boolean).join(' / ') || ''} />
+                <StatCell label="Last Sale Price"   value={form.sales_price ? fmt.currency(form.sales_price) : ''} color="#f59e0b" />
+                <StatCell label="Last Sale Date"    value={form.sale_date ? fmt.date(form.sale_date) : ''} />
               </div>
             )}
           </div>
