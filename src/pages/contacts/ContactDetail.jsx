@@ -308,40 +308,11 @@ export default function ContactDetail() {
             </div>
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
               <div>
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
-                  <div>
-                    <h1 style={{ fontSize: 26, fontWeight: 800, color: '#1e293b', margin: '0 0 6px 0', lineHeight: 1.2 }}>
-                      {contact.first_name} {contact.last_name}
-                    </h1>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                      {contact.contact_type && (
-                        <span style={{ background: '#dbeafe', color: '#1e40af', borderRadius: 20, padding: '3px 12px', fontSize: 12, fontWeight: 600 }}>
-                          {contact.contact_type}
-                        </span>
-                      )}
-                      {linkedCompany && (
-                        <span onClick={() => navigate(`/companies/${linkedCompany.id}`)}
-                          style={{ background: '#f0f9ff', color: '#0369a1', borderRadius: 20, padding: '3px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1px solid #bae6fd' }}>
-                          🏢 {linkedCompany.company_name}
-                        </span>
-                      )}
-                      {/* Verified toggle */}
-                      <button onClick={handleToggleVerified}
-                        style={{ padding: '3px 12px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700,
-                          background: contact.verified ? '#dcfce7' : '#f1f5f9',
-                          color: contact.verified ? '#16a34a' : '#94a3b8',
-                          transition: 'all 0.15s' }}>
-                        {contact.verified ? '✓ Verified' : 'Unverified'}
-                      </button>
-                    </div>
-                    {/* Last modified */}
-                    {(contact.updated_at || contact.last_modified_by) && (
-                      <p style={{ margin: '6px 0 0', fontSize: 11, color: '#94a3b8' }}>
-                        Modified {contact.updated_at ? new Date(contact.updated_at).toLocaleDateString() : ''}
-                        {contact.last_modified_by ? ` by ${contact.last_modified_by}` : ''}
-                      </p>
-                    )}
-                  </div>
+                {/* ── Top row: name + action buttons ── */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4, flexWrap: 'wrap', gap: 8 }}>
+                  <h1 style={{ fontSize: 26, fontWeight: 800, color: '#1e293b', margin: 0, lineHeight: 1.2 }}>
+                    {contact.first_name} {contact.last_name}
+                  </h1>
                   <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                     {editing ? (
                       <>
@@ -369,16 +340,78 @@ export default function ContactDetail() {
                   </div>
                 </div>
 
+                {/* ── Contact type subtitle ── */}
+                {contact.contact_type && (
+                  <p style={{ margin: '2px 0 6px', fontSize: 13, color: '#64748b', fontWeight: 500 }}>{contact.contact_type}</p>
+                )}
+
+                {/* ── Linked company line ── */}
+                {linkedCompany && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                    <span style={{ fontSize: 13, color: '#94a3b8' }}>🏢</span>
+                    <button onClick={() => navigate(`/companies/${linkedCompany.id}`)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#1e40af', fontSize: 13, fontWeight: 700, textDecoration: 'underline' }}>
+                      {linkedCompany.company_name}
+                    </button>
+                  </div>
+                )}
+
                 {deleteError && (
                   <div style={{ fontSize: 12, color: '#dc2626', padding: '6px 10px', background: '#fee2e2', borderRadius: 6, marginBottom: 8 }}>{deleteError}</div>
                 )}
 
+                {/* ── Contact info rows ── */}
                 {!editing && (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0 24px', marginTop: 12 }}>
-                    <ReadField label="Email" value={contact.email_address} href={contact.email_address ? `mailto:${contact.email_address}` : null} />
-                    <ReadField label="Main Phone" value={contact.main_phone} href={contact.main_phone ? `tel:${contact.main_phone}` : null} />
-                    <ReadField label="Cell Phone" value={contact.cell_phone} href={contact.cell_phone ? `tel:${contact.cell_phone}` : null} />
-                    <ReadField label={useCompanyAddr ? 'Address (from Company)' : 'Address'} value={fullAddress || null} />
+                  <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 10, marginTop: 4, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    {/* Phones on one line */}
+                    {(contact.main_phone || contact.cell_phone) && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+                        {contact.main_phone && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Work</span>
+                            <a href={`tel:${contact.main_phone}`} style={{ fontSize: 13, color: '#1e293b', textDecoration: 'none' }}>{contact.main_phone}</a>
+                          </div>
+                        )}
+                        {contact.cell_phone && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Cell</span>
+                            <a href={`tel:${contact.cell_phone}`} style={{ fontSize: 13, color: '#1e293b', textDecoration: 'none' }}>{contact.cell_phone}</a>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {contact.email_address && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', minWidth: 40 }}>Email</span>
+                        <a href={`mailto:${contact.email_address}`} style={{ fontSize: 13, color: '#1e40af', textDecoration: 'none' }}>{contact.email_address}</a>
+                      </div>
+                    )}
+                    {fullAddress && (
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', minWidth: 40, paddingTop: 1 }}>
+                          {useCompanyAddr ? 'Addr*' : 'Addr'}
+                        </span>
+                        <span style={{ fontSize: 13, color: '#475569' }}>
+                          {fullAddress}{useCompanyAddr && <span style={{ fontSize: 11, color: '#0369a1', marginLeft: 6 }}>(from Company)</span>}
+                        </span>
+                      </div>
+                    )}
+                    {/* ── Bottom strip: verified + modified ── */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4, flexWrap: 'wrap' }}>
+                      <button onClick={handleToggleVerified}
+                        style={{ padding: '3px 12px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                          background: contact.verified ? '#dcfce7' : '#f1f5f9',
+                          color: contact.verified ? '#16a34a' : '#94a3b8',
+                          transition: 'all 0.15s' }}>
+                        {contact.verified ? '● Verified' : 'Unverified'}
+                      </button>
+                      {(contact.updated_at || contact.last_modified_by) && (
+                        <span style={{ fontSize: 11, color: '#94a3b8' }}>
+                          Modified {contact.updated_at ? new Date(contact.updated_at).toLocaleDateString() : ''}
+                          {contact.last_modified_by ? ` by ${contact.last_modified_by}` : ''}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
