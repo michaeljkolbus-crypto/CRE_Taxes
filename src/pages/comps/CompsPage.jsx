@@ -37,6 +37,7 @@ export default function CompsPage() {
   const [showImportModal, setShowImportModal] = useState(false)
   const [columns, setColumns] = useState(COMPS_COLUMNS)
   const [selectedIds, setSelectedIds] = useState([])
+  const [importResult, setImportResult] = useState(null)
   const pageSize = 50
 
   useEffect(() => { fetchComps() }, [search, county, propType, page])
@@ -101,11 +102,12 @@ export default function CompsPage() {
         if (!error) imported = toInsert.length
         else errors += toInsert.length
       }
-      alert(`Import complete: ${imported} imported, ${duplicates} duplicates skipped, ${errors} errors`)
       setShowImportModal(false)
+      setImportResult(`✓ Import complete: ${imported} imported, ${duplicates} duplicates skipped, ${errors} errors`)
       fetchComps()
     } else {
-      alert('XLSX support coming soon. Please use CSV format.')
+      setShowImportModal(false)
+      setImportResult('⚠ XLSX support coming soon. Please use CSV format.')
     }
   }
 
@@ -132,9 +134,17 @@ export default function CompsPage() {
   }
 
   async function addComp(formData) {
-    const { error } = await supabase.from('comps').insert([formData])
-    if (!error) { setShowAddModal(false); fetchComps() }
-    else console.error(error)
+    const { data, error } = await supabase.from('comps').insert([formData]).select()
+    if (!error) {
+      setShowAddModal(false)
+      if (data?.[0]) {
+        setComps(prev => [data[0], ...prev])
+        setTotal(prev => prev + 1)
+      }
+      fetchComps()
+    } else {
+      console.error(error)
+    }
   }
 
   function toggleSelectAll() {
@@ -162,6 +172,13 @@ export default function CompsPage() {
         massReplaceFields={MASS_REPLACE_FIELDS}
         onMassReplace={handleMassReplace}
       />
+
+      {importResult && (
+        <div style={{ background: importResult.startsWith('✓') ? '#dcfce7' : '#fef9c3', borderBottom: '1px solid #e2e8f0', padding: '10px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: 13, color: importResult.startsWith('✓') ? '#166534' : '#854d0e', fontWeight: 500 }}>{importResult}</span>
+          <button onClick={() => setImportResult(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: '#64748b', lineHeight: 1 }}>✕</button>
+        </div>
+      )}
 
       {/* Filter bar */}
       <div style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', padding: '10px 24px' }}>
