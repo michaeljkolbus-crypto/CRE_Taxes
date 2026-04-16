@@ -12,6 +12,7 @@ import CompanyDetail from './pages/companies/CompanyDetail'
 import AppealsPage from './pages/appeals/AppealsPage'
 import AppealDetail from './pages/appeals/AppealDetail'
 import CompsPage from './pages/comps/CompsPage'
+import DeadlinesPage from './pages/deadlines/DeadlinesPage'
 import TasksPage from './pages/tasks/TasksPage'
 import SettingsPage from './pages/settings/SettingsPage'
 import UserProfilePage from './pages/profile/UserProfilePage'
@@ -54,6 +55,7 @@ function AppRoutes() {
       <Route path="/appeals" element={<PrivateRoute><Layout><AppealsPage /></Layout></PrivateRoute>} />
       <Route path="/appeals/:id" element={<PrivateRoute><Layout><AppealDetail /></Layout></PrivateRoute>} />
       <Route path="/comps" element={<PrivateRoute><Layout><CompsPage /></Layout></PrivateRoute>} />
+      <Route path="/deadlines" element={<PrivateRoute><Layout><DeadlinesPage /></Layout></PrivateRoute>} />
       <Route path="/tasks" element={<PrivateRoute><Layout><TasksPage /></Layout></PrivateRoute>} />
       <Route path="/settings" element={<PrivateRoute><Layout><SettingsPage /></Layout></PrivateRoute>} />
       <Route path="/profile" element={<PrivateRoute><Layout><UserProfilePage /></Layout></PrivateRoute>} />

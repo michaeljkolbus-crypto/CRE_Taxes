@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
@@ -17,13 +17,188 @@ function calcFinancials(appeal) {
   return { eavReduction, totalTaxSavings, commissionAmount }
 }
 
+const STORAGE_BUCKET = 'appeal-documents'
+const DOC_TYPES = ['Agreement', 'Hearing Notice', 'BOR Decision', 'PTAB Decision', 'Evidence', 'Correspondence', 'Other']
+
 // ── Tab definitions ────────────────────────────────────────────────────────
 const ALL_TABS = [
   { id: 'Appeal',      label: 'Appeal' },
   { id: 'Financials',  label: 'Financials' },
   { id: 'LinkedComps', label: 'Linked Comps' },
+  { id: 'Documents',   label: '📎 Documents' },
 ]
 const DEFAULT_TAB_CONFIG = ALL_TABS.map(t => ({ ...t, visible: true }))
+
+// ── LinkCompsModal ─────────────────────────────────────────────────────────
+function LinkCompsModal({ appealId, linkedComps, onClose, onSaved }) {
+  const [allComps, setAllComps] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [selections, setSelections] = useState({})
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    // Seed from already-linked comps
+    const init = {}
+    linkedComps.forEach(ac => {
+      init[ac.comp_id] = {
+        linked: true,
+        relevance_score: ac.relevance_score ?? '',
+        is_selected: ac.is_selected ?? false,
+        notes: ac.notes ?? '',
+        appeal_comp_id: ac.id,
+      }
+    })
+    setSelections(init)
+
+    supabase
+      .from('comps')
+      .select('id, address, sale_date, sale_price, building_sf, county, property_type')
+      .order('sale_date', { ascending: false })
+      .then(({ data }) => { if (data) setAllComps(data); setLoading(false) })
+  }, [])
+
+  const toggleLink = (compId) => {
+    setSelections(prev => {
+      const cur = prev[compId]
+      if (cur?.linked) {
+        return { ...prev, [compId]: { ...cur, linked: false } }
+      }
+      return {
+        ...prev,
+        [compId]: { linked: true, relevance_score: '', is_selected: false, notes: '', appeal_comp_id: null }
+      }
+    })
+  }
+
+  const updateSel = (compId, field, value) => {
+    setSelections(prev => ({ ...prev, [compId]: { ...prev[compId], [field]: value } }))
+  }
+
+  const handleSave = async () => {
+    setSaving(true); setError(null)
+    for (const [compId, sel] of Object.entries(selections)) {
+      if (sel.linked) {
+        const payload = {
+          relevance_score: sel.relevance_score !== '' ? parseFloat(sel.relevance_score) : null,
+          is_selected: sel.is_selected || false,
+          notes: sel.notes || null,
+        }
+        if (sel.appeal_comp_id) {
+          const { error: e } = await supabase.from('appeal_comps').update(payload).eq('id', sel.appeal_comp_id)
+          if (e) { setError('Save failed: ' + e.message); setSaving(false); return }
+        } else {
+          const { error: e } = await supabase.from('appeal_comps').insert({ appeal_id: appealId, comp_id: compId, ...payload })
+          if (e) { setError('Save failed: ' + e.message); setSaving(false); return }
+        }
+      } else if (sel.appeal_comp_id) {
+        await supabase.from('appeal_comps').delete().eq('id', sel.appeal_comp_id)
+      }
+    }
+    setSaving(false)
+    onSaved()
+    onClose()
+  }
+
+  const filtered = allComps.filter(c =>
+    !search || c.address?.toLowerCase().includes(search.toLowerCase())
+  )
+
+  const linkedCount = Object.values(selections).filter(s => s.linked).length
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
+      <div style={{ background: '#fff', borderRadius: 14, width: 820, maxHeight: '88vh', display: 'flex', flexDirection: 'column', boxShadow: '0 12px 48px rgba(0,0,0,0.22)' }}>
+        {/* Header */}
+        <div style={{ padding: '20px 24px 0', borderBottom: '1px solid #e2e8f0', paddingBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#1e293b' }}>Link Comparable Sales</h3>
+              <p style={{ margin: '4px 0 0', fontSize: 12, color: '#64748b' }}>{linkedCount} comp{linkedCount !== 1 ? 's' : ''} linked</p>
+            </div>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#94a3b8', lineHeight: 1 }}>✕</button>
+          </div>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search by address..."
+            style={{ width: '100%', padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }}
+          />
+        </div>
+
+        {/* Body */}
+        <div style={{ overflowY: 'auto', flex: 1, padding: '0 24px' }}>
+          {loading ? (
+            <div style={{ padding: 32, textAlign: 'center', color: '#64748b', fontSize: 13 }}>Loading comps...</div>
+          ) : filtered.length === 0 ? (
+            <div style={{ padding: 32, textAlign: 'center', color: '#64748b', fontSize: 13 }}>No comps found</div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead style={{ position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+                <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+                  <th style={{ padding: '10px 8px', textAlign: 'center', width: 36, color: '#475569', fontWeight: 600 }}>Link</th>
+                  <th style={{ padding: '10px 8px', textAlign: 'left', color: '#475569', fontWeight: 600 }}>Address</th>
+                  <th style={{ padding: '10px 8px', textAlign: 'center', color: '#475569', fontWeight: 600 }}>Sale Date</th>
+                  <th style={{ padding: '10px 8px', textAlign: 'center', color: '#475569', fontWeight: 600 }}>Sale Price</th>
+                  <th style={{ padding: '10px 8px', textAlign: 'center', color: '#475569', fontWeight: 600 }}>Bldg SF</th>
+                  <th style={{ padding: '10px 8px', textAlign: 'center', color: '#475569', fontWeight: 600 }}>Relevance (0–1)</th>
+                  <th style={{ padding: '10px 8px', textAlign: 'center', color: '#475569', fontWeight: 600 }}>Selected</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((c, idx) => {
+                  const sel = selections[c.id]
+                  const isLinked = sel?.linked || false
+                  return (
+                    <tr key={c.id} style={{ background: isLinked ? '#eff6ff' : idx % 2 === 0 ? '#fff' : '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                      <td style={{ padding: '8px', textAlign: 'center' }}>
+                        <input type="checkbox" checked={isLinked} onChange={() => toggleLink(c.id)} style={{ width: 15, height: 15, cursor: 'pointer', accentColor: '#1e40af' }} />
+                      </td>
+                      <td style={{ padding: '8px', color: '#1e293b', fontWeight: isLinked ? 600 : 400 }}>{c.address || '—'}</td>
+                      <td style={{ padding: '8px', textAlign: 'center', color: '#475569' }}>{c.sale_date ? new Date(c.sale_date).toLocaleDateString() : '—'}</td>
+                      <td style={{ padding: '8px', textAlign: 'center', color: '#475569' }}>{fmt.currency(parseFloat(c.sale_price) || 0)}</td>
+                      <td style={{ padding: '8px', textAlign: 'center', color: '#475569' }}>{c.building_sf ? fmt.number(parseFloat(c.building_sf)) : '—'}</td>
+                      <td style={{ padding: '8px', textAlign: 'center' }}>
+                        {isLinked ? (
+                          <input
+                            type="number" min="0" max="1" step="0.01"
+                            value={sel.relevance_score}
+                            onChange={e => updateSel(c.id, 'relevance_score', e.target.value)}
+                            placeholder="0.00"
+                            style={{ width: 70, padding: '4px 6px', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: 12, textAlign: 'center' }}
+                          />
+                        ) : <span style={{ color: '#cbd5e1' }}>—</span>}
+                      </td>
+                      <td style={{ padding: '8px', textAlign: 'center' }}>
+                        {isLinked ? (
+                          <input type="checkbox" checked={sel.is_selected || false} onChange={e => updateSel(c.id, 'is_selected', e.target.checked)}
+                            style={{ width: 15, height: 15, cursor: 'pointer', accentColor: '#1e40af' }} />
+                        ) : <span style={{ color: '#cbd5e1' }}>—</span>}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '14px 24px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          {error ? <span style={{ color: '#ef4444', fontSize: 13 }}>{error}</span> : <span />}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={onClose} style={{ padding: '8px 16px', background: '#f1f5f9', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 600, color: '#475569', cursor: 'pointer' }}>Cancel</button>
+            <button onClick={handleSave} disabled={saving}
+              style={{ padding: '8px 20px', background: '#1e40af', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+              {saving ? 'Saving…' : 'Save Links'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // ── ViewsBar ───────────────────────────────────────────────────────────────
 function ViewsBar({ views, activeViewId, onLoadView, onEditLayout }) {
@@ -128,14 +303,26 @@ export default function AppealDetail() {
   const navigate = useNavigate()
   const { id }   = useParams()
   const { user } = useAuth()
+  const fileInputRef = useRef(null)
+
   const [appeal, setAppeal] = useState(null)
   const [stages, setStages] = useState([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [saving,  setSaving]  = useState(false)
   const [comps,   setComps]   = useState([])
+  const [docs,    setDocs]    = useState([])
   const [form,    setForm]    = useState({})
   const [error,   setError]   = useState(null)
+
+  // Documents state
+  const [uploadingDoc,  setUploadingDoc]  = useState(false)
+  const [docError,      setDocError]      = useState(null)
+  const [docType,       setDocType]       = useState('Other')
+  const [docSuccess,    setDocSuccess]    = useState(null)
+
+  // Comps linking modal
+  const [linkCompsOpen, setLinkCompsOpen] = useState(false)
 
   // ── Views / layout ───────────────────────────────────────────────────────
   const { views, saveView, deleteView } = useViewPreferences('appeal_detail')
@@ -166,7 +353,7 @@ export default function AppealDetail() {
 
   const visibleTabs = tabConfig.filter(t => t.visible)
 
-  useEffect(() => { fetchStages(); fetchAppeal(); fetchComps() }, [id])
+  useEffect(() => { fetchStages(); fetchAppeal(); fetchComps(); fetchDocs() }, [id])
 
   const fetchStages = async () => {
     const { data } = await supabase.from('appeal_stages').select('*').order('sort_order', { ascending: true })
@@ -187,9 +374,75 @@ export default function AppealDetail() {
   const fetchComps = async () => {
     const { data } = await supabase
       .from('appeal_comps')
-      .select('*, comp:comps(id, address, sale_date, sale_price, building_sf, relevance_score)')
+      .select('*, comp:comps(id, address, sale_date, sale_price, building_sf)')
       .eq('appeal_id', id)
+      .order('created_at', { ascending: true })
     if (data) setComps(data)
+  }
+
+  const fetchDocs = async () => {
+    const { data } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('appeal_id', id)
+      .order('uploaded_at', { ascending: false })
+    if (data) setDocs(data)
+  }
+
+  // ── Upload document ──────────────────────────────────────────────────────
+  const uploadDoc = async (file) => {
+    if (!file) return
+    setUploadingDoc(true); setDocError(null); setDocSuccess(null)
+    const ext  = file.name.split('.').pop()
+    const path = `${id}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+
+    const { error: storageErr } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .upload(path, file, { upsert: false })
+
+    if (storageErr) {
+      setDocError('Upload failed: ' + storageErr.message)
+      setUploadingDoc(false)
+      return
+    }
+
+    const { data: urlData } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path)
+
+    const { error: dbErr } = await supabase.from('documents').insert({
+      appeal_id:     id,
+      file_name:     file.name,
+      storage_path:  path,
+      public_url:    urlData.publicUrl,
+      document_type: docType,
+      uploaded_by:   user?.id,
+    })
+
+    if (dbErr) {
+      setDocError('Failed to save document record: ' + dbErr.message)
+    } else {
+      setDocSuccess(`"${file.name}" uploaded successfully`)
+      fetchDocs()
+    }
+    setUploadingDoc(false)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  // ── Delete document ──────────────────────────────────────────────────────
+  const deleteDoc = async (doc) => {
+    if (!confirm(`Delete "${doc.file_name}"? This cannot be undone.`)) return
+    setDocError(null)
+    if (doc.storage_path) {
+      await supabase.storage.from(STORAGE_BUCKET).remove([doc.storage_path])
+    }
+    const { error: dbErr } = await supabase.from('documents').delete().eq('id', doc.id)
+    if (dbErr) setDocError('Failed to delete: ' + dbErr.message)
+    else fetchDocs()
+  }
+
+  // ── Remove comp link ─────────────────────────────────────────────────────
+  const removeComp = async (appealCompId) => {
+    await supabase.from('appeal_comps').delete().eq('id', appealCompId)
+    fetchComps()
   }
 
   const handleSave = async () => {
@@ -251,7 +504,6 @@ export default function AppealDetail() {
   const showPTAB = form.bor_result === 'Denied' || form.bor_result === 'Partial'
 
   const INP = { width: '100%', padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box' }
-  const NUM = { ...INP, type: 'number' }
 
   return (
     <div style={{ padding: 24, background: '#f8fafc', minHeight: '100vh' }}>
@@ -266,12 +518,10 @@ export default function AppealDetail() {
               Appeal — {appeal.property?.address} ({appeal.tax_year})
             </h1>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              {/* Property chip */}
               <Link to={`/properties/${appeal.property?.id}`}
                 style={{ display: 'inline-block', background: '#eff6ff', border: '1px solid #1e40af', color: '#1e40af', padding: '5px 12px', borderRadius: 4, fontSize: 13, textDecoration: 'none' }}>
                 {appeal.property?.address}
               </Link>
-              {/* Stage */}
               {!editing && appeal.stage && (
                 <div style={{ display: 'inline-block', background: appeal.stage.color, color: '#fff', padding: '5px 12px', borderRadius: 4, fontSize: 13, fontWeight: 500 }}>
                   {appeal.stage.name}
@@ -284,14 +534,12 @@ export default function AppealDetail() {
                   {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               )}
-              {/* Verified toggle */}
               <button onClick={handleToggleVerified}
                 style={{ padding: '5px 12px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700,
                   background: appeal.verified ? '#dcfce7' : '#f1f5f9', color: appeal.verified ? '#16a34a' : '#94a3b8', transition: 'all 0.15s' }}>
                 {appeal.verified ? '✓ Verified' : 'Unverified'}
               </button>
             </div>
-            {/* Last modified */}
             {(appeal.updated_at || appeal.last_modified_by) && (
               <p style={{ margin: '8px 0 0', fontSize: 11, color: '#94a3b8' }}>
                 Modified {appeal.updated_at ? new Date(appeal.updated_at).toLocaleDateString() : ''}
@@ -317,12 +565,10 @@ export default function AppealDetail() {
                   style={{ padding: '8px 16px', background: '#1e40af', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 14 }}>
                   ✏️ Edit
                 </button>
-                {user?.is_admin && (
-                  <button onClick={handleDelete}
-                    style={{ padding: '8px 16px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 14 }}>
-                    Delete
-                  </button>
-                )}
+                <button onClick={handleDelete}
+                  style={{ padding: '8px 16px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 14 }}>
+                  Delete
+                </button>
               </>
             )}
           </div>
@@ -336,7 +582,6 @@ export default function AppealDetail() {
       {/* ── VIEWS BAR + TABS ─────────────────────────────────────────────── */}
       <ViewsBar views={views} activeViewId={activeViewId} onLoadView={handleLoadView} onEditLayout={() => setShowLayoutModal(true)} />
 
-      {/* Tab strip */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '2px solid #e2e8f0' }}>
         {visibleTabs.map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
@@ -351,7 +596,6 @@ export default function AppealDetail() {
       {/* ── APPEAL TAB ───────────────────────────────────────────────────── */}
       {activeTab === 'Appeal' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* BOR */}
           <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 20 }}>
             <h2 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600, color: '#1e293b' }}>Board of Review (BOR)</h2>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
@@ -372,7 +616,6 @@ export default function AppealDetail() {
             </div>
           </div>
 
-          {/* PTAB (conditional) */}
           {showPTAB && (
             <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 20 }}>
               <h2 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600, color: '#1e293b' }}>Property Tax Appeal Board (PTAB)</h2>
@@ -395,7 +638,6 @@ export default function AppealDetail() {
             </div>
           )}
 
-          {/* Notes */}
           <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 20 }}>
             <h2 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600, color: '#1e293b' }}>Notes</h2>
             {editing ? (
@@ -412,13 +654,12 @@ export default function AppealDetail() {
       {/* ── FINANCIALS TAB ───────────────────────────────────────────────── */}
       {activeTab === 'Financials' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-          {/* Commission Calculator */}
           <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 20 }}>
             <h2 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600, color: '#1e293b' }}>Commission Calculator</h2>
             <div style={{ fontSize: 13, display: 'grid', gap: 8 }}>
               {[
-                { label: 'EAV (Pre-Reduction)',  field: 'eav_pre',               val: fmt.currency(parseFloat(form.eav_pre) || 0) },
-                { label: 'EAV (Post-Reduction)', field: 'eav_post',              val: fmt.currency(parseFloat(form.eav_post) || 0) },
+                { label: 'EAV (Pre-Reduction)',  field: 'eav_pre',  val: fmt.currency(parseFloat(form.eav_pre) || 0) },
+                { label: 'EAV (Post-Reduction)', field: 'eav_post', val: fmt.currency(parseFloat(form.eav_post) || 0) },
               ].map(({ label, field, val }) => (
                 <div key={field} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, alignItems: 'center' }}>
                   <div style={{ color: '#64748b' }}>{label}</div>
@@ -467,7 +708,6 @@ export default function AppealDetail() {
             </div>
           </div>
 
-          {/* Payment Tracking */}
           <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 20 }}>
             <h2 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600, color: '#1e293b' }}>Payment Tracking</h2>
             <div style={{ display: 'grid', gap: 12, fontSize: 13 }}>
@@ -504,43 +744,184 @@ export default function AppealDetail() {
       {activeTab === 'LinkedComps' && (
         <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 20 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: '#1e293b' }}>Linked Comps</h2>
-            <button style={{ padding: '6px 12px', background: '#1e40af', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 13 }}>
-              Add Comps
+            <div>
+              <h2 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 600, color: '#1e293b' }}>Linked Comps</h2>
+              <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>{comps.length} comp{comps.length !== 1 ? 's' : ''} linked to this appeal</p>
+            </div>
+            <button onClick={() => setLinkCompsOpen(true)}
+              style={{ padding: '7px 14px', background: '#1e40af', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+              + Link / Edit Comps
             </button>
           </div>
           {comps.length === 0 ? (
-            <div style={{ color: '#64748b', fontSize: 13, textAlign: 'center', padding: 24 }}>No comps linked to this appeal yet</div>
+            <div style={{ color: '#64748b', fontSize: 13, textAlign: 'center', padding: '32px 24px', background: '#f8fafc', borderRadius: 8 }}>
+              No comps linked yet. Click "+ Link / Edit Comps" to add comparable sales to this appeal.
+            </div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
-                <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                  {['Address','Sale Date','Sale Price','Bldg SF','$/SF','Score','Selected'].map(h => (
-                    <th key={h} style={{ padding: 8, textAlign: h === 'Address' ? 'left' : 'center', fontWeight: 600, color: '#1e293b' }}>{h}</th>
+                <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                  {['Address','Sale Date','Sale Price','Bldg SF','$/SF','Relevance','Selected',''].map(h => (
+                    <th key={h} style={{ padding: '8px 10px', textAlign: h === 'Address' ? 'left' : 'center', fontWeight: 600, color: '#475569', fontSize: 12 }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {comps.map((c, idx) => (
-                  <tr key={c.id} style={{ background: idx % 2 === 0 ? '#fff' : '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                    <td style={{ padding: 8, color: '#1e293b' }}>{c.comp?.address}</td>
-                    <td style={{ padding: 8, textAlign: 'center', color: '#1e293b' }}>{c.comp?.sale_date ? new Date(c.comp.sale_date).toLocaleDateString() : '—'}</td>
-                    <td style={{ padding: 8, textAlign: 'center', color: '#1e293b' }}>{fmt.currency(parseFloat(c.comp?.sale_price) || 0)}</td>
-                    <td style={{ padding: 8, textAlign: 'center', color: '#1e293b' }}>{fmt.number(parseFloat(c.comp?.building_sf) || 0)}</td>
-                    <td style={{ padding: 8, textAlign: 'center', color: '#1e293b' }}>{fmt.currency((parseFloat(c.comp?.sale_price) || 0) / (parseFloat(c.comp?.building_sf) || 1))}</td>
-                    <td style={{ padding: 8, textAlign: 'center', color: '#1e293b' }}>{(parseFloat(c.comp?.relevance_score) || 0).toFixed(2)}</td>
-                    <td style={{ padding: 8, textAlign: 'center' }}><input type="checkbox" style={{ width: 16, height: 16, cursor: 'pointer' }} /></td>
-                  </tr>
-                ))}
+                {comps.map((c, idx) => {
+                  const salePrice = parseFloat(c.comp?.sale_price) || 0
+                  const bldgSF    = parseFloat(c.comp?.building_sf) || 1
+                  const dollarSF  = salePrice / bldgSF
+                  return (
+                    <tr key={c.id} style={{ background: idx % 2 === 0 ? '#fff' : '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                      <td style={{ padding: '9px 10px', color: '#1e293b', fontWeight: 500 }}>{c.comp?.address || '—'}</td>
+                      <td style={{ padding: '9px 10px', textAlign: 'center', color: '#475569' }}>{c.comp?.sale_date ? new Date(c.comp.sale_date).toLocaleDateString() : '—'}</td>
+                      <td style={{ padding: '9px 10px', textAlign: 'center', color: '#1e293b' }}>{fmt.currency(salePrice)}</td>
+                      <td style={{ padding: '9px 10px', textAlign: 'center', color: '#475569' }}>{c.comp?.building_sf ? fmt.number(bldgSF) : '—'}</td>
+                      <td style={{ padding: '9px 10px', textAlign: 'center', color: '#475569' }}>{c.comp?.building_sf ? fmt.currency(dollarSF) : '—'}</td>
+                      <td style={{ padding: '9px 10px', textAlign: 'center' }}>
+                        {c.relevance_score != null ? (
+                          <span style={{ background: '#eff6ff', color: '#1e40af', padding: '2px 8px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>
+                            {parseFloat(c.relevance_score).toFixed(2)}
+                          </span>
+                        ) : <span style={{ color: '#cbd5e1' }}>—</span>}
+                      </td>
+                      <td style={{ padding: '9px 10px', textAlign: 'center' }}>
+                        <input type="checkbox" checked={c.is_selected || false} disabled style={{ width: 15, height: 15, accentColor: '#1e40af' }} />
+                      </td>
+                      <td style={{ padding: '9px 10px', textAlign: 'center' }}>
+                        <button onClick={() => removeComp(c.id)}
+                          style={{ background: 'none', border: '1px solid #fca5a5', color: '#ef4444', borderRadius: 4, padding: '3px 8px', cursor: 'pointer', fontSize: 12 }}>
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           )}
         </div>
       )}
 
-      {/* ── Edit Layout Modal ───────────────────────────────────────────── */}
+      {/* ── DOCUMENTS TAB ────────────────────────────────────────────────── */}
+      {activeTab === 'Documents' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Upload card */}
+          <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 20 }}>
+            <h2 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600, color: '#1e293b' }}>Upload Document</h2>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#64748b', marginBottom: 6 }}>Document Type</label>
+                <select value={docType} onChange={e => setDocType(e.target.value)}
+                  style={{ padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, fontFamily: 'inherit', background: '#fff', minWidth: 160 }}>
+                  {DOC_TYPES.map(t => <option key={t}>{t}</option>)}
+                </select>
+              </div>
+              <div style={{ flex: 1, minWidth: 220 }}>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#64748b', marginBottom: 6 }}>File</label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  onChange={e => uploadDoc(e.target.files[0])}
+                  disabled={uploadingDoc}
+                  style={{ display: 'block', fontSize: 13, color: '#1e293b', cursor: uploadingDoc ? 'wait' : 'pointer' }}
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt,.csv"
+                />
+              </div>
+              {uploadingDoc && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#1e40af', fontSize: 13 }}>
+                  <span style={{ animation: 'spin 1s linear infinite' }}>⟳</span> Uploading…
+                </div>
+              )}
+            </div>
+            {docError && (
+              <div style={{ marginTop: 12, background: '#fee2e2', color: '#991b1b', padding: '10px 14px', borderRadius: 6, fontSize: 13 }}>{docError}</div>
+            )}
+            {docSuccess && (
+              <div style={{ marginTop: 12, background: '#dcfce7', color: '#166534', padding: '10px 14px', borderRadius: 6, fontSize: 13 }}>
+                ✓ {docSuccess}
+                <button onClick={() => setDocSuccess(null)} style={{ float: 'right', background: 'none', border: 'none', color: '#166534', cursor: 'pointer', fontSize: 14 }}>✕</button>
+              </div>
+            )}
+          </div>
+
+          {/* Documents list */}
+          <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: '#1e293b' }}>Documents</h2>
+              <span style={{ fontSize: 12, color: '#64748b' }}>{docs.length} file{docs.length !== 1 ? 's' : ''}</span>
+            </div>
+            {docs.length === 0 ? (
+              <div style={{ color: '#64748b', fontSize: 13, textAlign: 'center', padding: '32px 24px', background: '#f8fafc', borderRadius: 8 }}>
+                No documents uploaded yet. Use the upload panel above to add agreements, notices, or decisions.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {docs.map(doc => {
+                  const typeColors = {
+                    'Agreement':       { bg: '#eff6ff', color: '#1e40af' },
+                    'Hearing Notice':  { bg: '#fef3c7', color: '#92400e' },
+                    'BOR Decision':    { bg: '#dcfce7', color: '#166534' },
+                    'PTAB Decision':   { bg: '#f3e8ff', color: '#6b21a8' },
+                    'Evidence':        { bg: '#e0f2fe', color: '#0c4a6e' },
+                    'Correspondence':  { bg: '#fce7f3', color: '#9d174d' },
+                  }
+                  const tc = typeColors[doc.document_type] || { bg: '#f1f5f9', color: '#475569' }
+                  const fileExt = doc.file_name?.split('.').pop()?.toUpperCase() || ''
+                  return (
+                    <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                      {/* File icon */}
+                      <div style={{ width: 36, height: 36, background: '#e2e8f0', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#475569', flexShrink: 0 }}>
+                        {fileExt || '📄'}
+                      </div>
+                      {/* File info */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {doc.file_name}
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 3 }}>
+                          <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 10, background: tc.bg, color: tc.color, fontWeight: 600 }}>
+                            {doc.document_type || 'Other'}
+                          </span>
+                          <span style={{ fontSize: 11, color: '#94a3b8' }}>
+                            {doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleDateString() : ''}
+                          </span>
+                        </div>
+                      </div>
+                      {/* Actions */}
+                      <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                        {doc.public_url && (
+                          <a href={doc.public_url} target="_blank" rel="noopener noreferrer"
+                            style={{ padding: '6px 12px', background: '#1e40af', color: '#fff', borderRadius: 5, fontSize: 12, fontWeight: 600, textDecoration: 'none', display: 'inline-block' }}>
+                            ↓ Download
+                          </a>
+                        )}
+                        <button onClick={() => deleteDoc(doc)}
+                          style={{ padding: '6px 10px', background: 'none', border: '1px solid #fca5a5', color: '#ef4444', borderRadius: 5, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Modals ───────────────────────────────────────────────────────── */}
       {showLayoutModal && (
         <EditLayoutModal tabConfig={tabConfig} views={views} onSave={handleSaveView} onDelete={deleteView} onClose={() => setShowLayoutModal(false)} />
+      )}
+
+      {linkCompsOpen && (
+        <LinkCompsModal
+          appealId={id}
+          linkedComps={comps}
+          onClose={() => setLinkCompsOpen(false)}
+          onSaved={fetchComps}
+        />
       )}
     </div>
   )
