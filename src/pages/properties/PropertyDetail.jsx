@@ -147,26 +147,31 @@ function PropertyContactsPanel({ propertyId, isAdmin }) {
   }
 
   return (
-    <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '16px', background: '#fff', marginBottom: '20px' }}>
-      <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', margin: '0 0 12px 0' }}>Linked Contacts</h3>
+    <div>
       {loading ? (
         <div style={{ fontSize: 13, color: '#64748b' }}>Loading...</div>
       ) : contacts.length === 0 ? (
-        <div style={{ fontSize: 13, color: '#64748b', marginBottom: '12px' }}>No contacts linked yet.</div>
+        <div style={{ fontSize: 13, color: '#64748b', marginBottom: '16px' }}>No contacts linked yet.</div>
       ) : (
-        <div style={{ marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{ marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {contacts.map(pc => (
-            <div key={pc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px', background: '#f8fafc', borderRadius: 6, fontSize: 13 }}>
+            <div key={pc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: '#f8fafc', borderRadius: 8, fontSize: 13, border: '1px solid #e2e8f0' }}>
               <div style={{ flex: 1 }}>
-                <span style={{ color: '#1e40af', fontWeight: 500 }}>{pc.contact?.first_name} {pc.contact?.last_name}</span>
-                <span style={{ display: 'inline-block', marginLeft: '8px', background: '#dbeafe', color: '#1e40af', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600 }}>{pc.role}</span>
-                {pc.is_primary && <span style={{ display: 'inline-block', marginLeft: '8px', color: '#fbbf24', fontSize: 16 }}>★</span>}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ color: '#1e40af', fontWeight: 600, fontSize: 14 }}>{pc.contact?.first_name} {pc.contact?.last_name}</span>
+                  {pc.is_primary && <span style={{ color: '#fbbf24', fontSize: 14 }}>★ Primary</span>}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                  <span style={{ background: '#dbeafe', color: '#1e40af', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600 }}>{pc.role}</span>
+                  {pc.contact?.main_phone && <span style={{ fontSize: 12, color: '#64748b' }}>{pc.contact.main_phone}</span>}
+                </div>
+                {pc.contact?.email_address && <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{pc.contact.email_address}</div>}
               </div>
-              <div style={{ display: 'flex', gap: '6px' }}>
+              <div style={{ display: 'flex', gap: '6px', marginLeft: 8 }}>
                 {!pc.is_primary && (
-                  <button onClick={() => handleSetPrimary(pc.id)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 12, padding: '2px 4px' }} title="Set as primary">☆</button>
+                  <button onClick={() => handleSetPrimary(pc.id)} style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#64748b', cursor: 'pointer', fontSize: 12, padding: '4px 8px', borderRadius: 6 }} title="Set as primary">★ Set Primary</button>
                 )}
-                <button onClick={() => handleRemoveContact(pc.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: '2px 4px' }}>✕</button>
+                <button onClick={() => handleRemoveContact(pc.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 16, fontWeight: 600, padding: '4px 6px' }}>✕</button>
               </div>
             </div>
           ))}
@@ -174,9 +179,9 @@ function PropertyContactsPanel({ propertyId, isAdmin }) {
       )}
       <button
         onClick={() => { fetchAvailableContacts(); setShowLinkModal(true) }}
-        style={{ width: '100%', padding: '8px', background: '#dbeafe', color: '#1e40af', border: '1px solid #bfdbfe', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+        style={{ padding: '9px 18px', background: '#1e40af', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
       >
-        Link Contact
+        + Link Contact
       </button>
       {showLinkModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
@@ -252,31 +257,34 @@ function AppealsPanel({ propertyId }) {
   }
 
   return (
-    <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '16px', background: '#fff' }}>
-      <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', margin: '0 0 12px 0' }}>Appeals</h3>
+    <div>
       {loading ? (
         <div style={{ fontSize: 13, color: '#64748b' }}>Loading...</div>
       ) : appeals.length === 0 ? (
-        <div style={{ fontSize: 13, color: '#64748b', marginBottom: '12px' }}>No appeals yet.</div>
+        <div style={{ fontSize: 13, color: '#64748b', marginBottom: '16px' }}>No appeals yet.</div>
       ) : (
-        <div style={{ marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{ marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {appeals.map(appeal => (
-            <div key={appeal.id} onClick={() => navigate(`/appeals/${appeal.id}`)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px', background: '#f8fafc', borderRadius: 6, fontSize: 13, cursor: 'pointer' }}>
+            <div key={appeal.id} onClick={() => navigate(`/appeals/${appeal.id}`)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: '#f8fafc', borderRadius: 8, fontSize: 13, cursor: 'pointer', border: '1px solid #e2e8f0', transition: 'background 0.15s' }}
+              onMouseEnter={e => e.currentTarget.style.background = '#eff6ff'}
+              onMouseLeave={e => e.currentTarget.style.background = '#f8fafc'}
+            >
               <div style={{ flex: 1 }}>
-                <span style={{ fontWeight: 600, color: '#1e293b' }}>Tax Year {appeal.tax_year}</span>
+                <span style={{ fontWeight: 700, color: '#1e293b', fontSize: 14 }}>Tax Year {appeal.tax_year}</span>
                 {appeal.stage && (
-                  <span style={{ display: 'inline-block', marginLeft: '8px', background: appeal.stage.color || '#dbeafe', color: '#1e40af', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600 }}>{appeal.stage.name}</span>
+                  <span style={{ display: 'inline-block', marginLeft: '10px', background: appeal.stage.color || '#dbeafe', color: '#1e40af', padding: '2px 10px', borderRadius: 12, fontSize: 11, fontWeight: 600 }}>{appeal.stage.name}</span>
                 )}
+                {appeal.bor_result && <div style={{ color: '#64748b', fontSize: 12, marginTop: 3 }}>BOR: {appeal.bor_result}</div>}
               </div>
-              {appeal.bor_result && <span style={{ color: '#64748b', fontSize: 12 }}>BOR: {appeal.bor_result}</span>}
+              <span style={{ color: '#94a3b8', fontSize: 16 }}>→</span>
             </div>
           ))}
         </div>
       )}
       {appealError && (
-        <div style={{ fontSize: 12, color: '#dc2626', marginBottom: '8px', padding: '6px 8px', background: '#fee2e2', borderRadius: 4 }}>{appealError}</div>
+        <div style={{ fontSize: 12, color: '#dc2626', marginBottom: '12px', padding: '8px 10px', background: '#fee2e2', borderRadius: 6 }}>{appealError}</div>
       )}
-      <button onClick={handleNewAppeal} style={{ width: '100%', padding: '8px', background: '#dbeafe', color: '#1e40af', border: '1px solid #bfdbfe', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+      <button onClick={handleNewAppeal} style={{ padding: '9px 18px', background: '#1e40af', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
         + New Appeal
       </button>
     </div>
@@ -290,6 +298,29 @@ function StatCell({ label, value, color }) {
     <div style={{ padding: '6px 16px 6px 0' }}>
       <p style={{ margin: 0, fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</p>
       <p style={{ margin: '3px 0 0', fontSize: 15, fontWeight: 700, color: color || '#1e293b' }}>{value}</p>
+    </div>
+  )
+}
+
+// ── Inline header edit field ─────────────────────────────────────────────────
+function HeaderField({ label, value, editing, onChange, type = 'text', options, inputStyle = {} }) {
+  const baseInput = { padding: '5px 8px', border: '1px solid #bfdbfe', borderRadius: 6, fontSize: 13, background: '#eff6ff', ...inputStyle }
+  if (!editing) return null
+  if (type === 'select') {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
+        <select value={value || ''} onChange={e => onChange(e.target.value)} style={baseInput}>
+          <option value="">—</option>
+          {options?.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+      </div>
+    )
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <span style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
+      <input type={type} value={value || ''} onChange={e => onChange(e.target.value)} style={baseInput} />
     </div>
   )
 }
@@ -406,7 +437,7 @@ export function PropertyDetail() {
   const fullAddress = addressParts.join(', ')
   const mapsAddress = encodeURIComponent(fullAddress || form.property_name || '')
 
-  const tabs = ['Overview', 'Tax & Assessment', 'Residential']
+  const tabs = ['Overview', 'Tax & Assessment', 'Residential', 'Industrial & Multifamily', 'Contacts', 'Appeals', 'Notes']
   const grid2col = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px 32px', marginBottom: '24px' }
 
   // ── Section header rendered inside the 2-col grid (spans full width) ──────
@@ -419,7 +450,7 @@ export function PropertyDetail() {
   const TabContent = () => {
     switch (activeTab) {
 
-      // ── OVERVIEW: Property Details + Building Breakdown + Sale History + Location ──
+      // ── OVERVIEW ──────────────────────────────────────────────────────────
       case 'Overview':
         return (
           <div style={grid2col}>
@@ -454,17 +485,6 @@ export function PropertyDetail() {
             <FieldRow label="Vacant SQ FT" value={form.vacant_sqft} editing={editing} type="number" onChange={v => f('vacant_sqft', v)} />
             <CalcRow label="Vacancy %" value={calcVacancyPct} format={v => v.toFixed(1) + '%'} />
             <FieldRow label="# of Parking Spaces" value={form.num_parking_spaces} editing={editing} type="number" onChange={v => f('num_parking_spaces', v)} />
-            <FieldRow label="Sprinkler System" value={form.sprinkler_system} editing={editing} onChange={v => f('sprinkler_system', v)} />
-            <FieldRow label="Apartment Mix" value={form.apartment_mix} editing={editing} onChange={v => f('apartment_mix', v)} />
-            <FieldRow label="# 0-Bed Apts" value={form.num_0bed_apts} editing={editing} type="number" onChange={v => f('num_0bed_apts', v)} />
-            <FieldRow label="# 1-Bed Apts" value={form.num_1bed_apts} editing={editing} type="number" onChange={v => f('num_1bed_apts', v)} />
-            <FieldRow label="# 2-Bed Apts" value={form.num_2bed_apts} editing={editing} type="number" onChange={v => f('num_2bed_apts', v)} />
-            <FieldRow label="# 3-Bed Apts" value={form.num_3bed_apts} editing={editing} type="number" onChange={v => f('num_3bed_apts', v)} />
-            <FieldRow label="# 4-Bed Apts" value={form.num_4bed_apts} editing={editing} type="number" onChange={v => f('num_4bed_apts', v)} />
-            <FieldRow label="Individual Laundry" value={form.individual_laundry} editing={editing} type="boolean" onChange={v => f('individual_laundry', v)} />
-            <FieldRow label="Manufacturing SQ FT" value={form.manufacturing_sqft} editing={editing} type="number" onChange={v => f('manufacturing_sqft', v)} />
-            <FieldRow label="Ceiling Height" value={form.ceiling_height} editing={editing} type="number" onChange={v => f('ceiling_height', v)} />
-            <FieldRow label="# Loading Docks" value={form.num_loading_docks} editing={editing} type="number" onChange={v => f('num_loading_docks', v)} />
             <FieldRow label="Other Improvements" value={form.other_improvements} editing={editing} onChange={v => f('other_improvements', v)} />
 
             <SH title="Sale History" />
@@ -495,11 +515,6 @@ export function PropertyDetail() {
             <FieldRow label="Parcel ID 5" value={form.parcel_id5} editing={editing} onChange={v => f('parcel_id5', v)} />
             <FieldRow label="Misc Parcels" value={form.misc_parcels} editing={editing} onChange={v => f('misc_parcels', v)} />
 
-            <SH title="Notes" />
-            <div style={{ gridColumn: '1 / -1' }}>
-              <FieldRow label="Notes" value={form.notes} editing={editing} type="textarea" onChange={v => f('notes', v)} />
-            </div>
-
           </div>
         )
 
@@ -521,7 +536,7 @@ export function PropertyDetail() {
           </div>
         )
 
-      // ── RESIDENTIAL + DUPLEX ──────────────────────────────────────────────
+      // ── RESIDENTIAL ───────────────────────────────────────────────────────
       case 'Residential':
         return (
           <div style={grid2col}>
@@ -549,6 +564,45 @@ export function PropertyDetail() {
             <CalcRow label="Basement Area SQ FT per Unit" value={calcBasementPerUnit} format={v => Math.round(v).toLocaleString()} />
             <CalcRow label="Finished BSMT Area SQ FT per Unit" value={calcFinishedBsmtPerUnit} format={v => Math.round(v).toLocaleString()} />
             <CalcRow label="Garage / Carport per Unit (SQ FT)" value={calcGaragePerUnit} format={v => Math.round(v).toLocaleString()} />
+          </div>
+        )
+
+      // ── INDUSTRIAL & MULTIFAMILY ──────────────────────────────────────────
+      case 'Industrial & Multifamily':
+        return (
+          <div style={grid2col}>
+
+            <SH title="Industrial" />
+            <FieldRow label="Manufacturing SQ FT" value={form.manufacturing_sqft} editing={editing} type="number" onChange={v => f('manufacturing_sqft', v)} />
+            <FieldRow label="Ceiling Height (ft)" value={form.ceiling_height} editing={editing} type="number" onChange={v => f('ceiling_height', v)} />
+            <FieldRow label="# Loading Docks" value={form.num_loading_docks} editing={editing} type="number" onChange={v => f('num_loading_docks', v)} />
+            <FieldRow label="Sprinkler System" value={form.sprinkler_system} editing={editing} onChange={v => f('sprinkler_system', v)} />
+
+            <SH title="Multifamily / Apartment" />
+            <FieldRow label="Apartment Mix" value={form.apartment_mix} editing={editing} onChange={v => f('apartment_mix', v)} />
+            <FieldRow label="Individual Laundry" value={form.individual_laundry} editing={editing} type="boolean" onChange={v => f('individual_laundry', v)} />
+            <FieldRow label="# 0-Bed Apts" value={form.num_0bed_apts} editing={editing} type="number" onChange={v => f('num_0bed_apts', v)} />
+            <FieldRow label="# 1-Bed Apts" value={form.num_1bed_apts} editing={editing} type="number" onChange={v => f('num_1bed_apts', v)} />
+            <FieldRow label="# 2-Bed Apts" value={form.num_2bed_apts} editing={editing} type="number" onChange={v => f('num_2bed_apts', v)} />
+            <FieldRow label="# 3-Bed Apts" value={form.num_3bed_apts} editing={editing} type="number" onChange={v => f('num_3bed_apts', v)} />
+            <FieldRow label="# 4-Bed Apts" value={form.num_4bed_apts} editing={editing} type="number" onChange={v => f('num_4bed_apts', v)} />
+
+          </div>
+        )
+
+      // ── CONTACTS ──────────────────────────────────────────────────────────
+      case 'Contacts':
+        return (
+          <div>
+            <PropertyContactsPanel propertyId={id} isAdmin={isAdmin} />
+          </div>
+        )
+
+      // ── APPEALS ───────────────────────────────────────────────────────────
+      case 'Appeals':
+        return (
+          <div>
+            <AppealsPanel propertyId={id} />
           </div>
         )
 
@@ -584,11 +638,20 @@ export function PropertyDetail() {
             {/* Row 1: Badges + Action Buttons */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                {form.property_type && (
-                  <span style={{ background: '#dbeafe', color: '#1e40af', borderRadius: 20, padding: '3px 12px', fontSize: 12, fontWeight: 600 }}>{form.property_type}</span>
-                )}
-                {form.property_subtype && (
-                  <span style={{ background: '#f1f5f9', color: '#475569', borderRadius: 20, padding: '3px 12px', fontSize: 12, fontWeight: 600 }}>{form.property_subtype}</span>
+                {editing ? (
+                  <>
+                    <HeaderField label="Property Type" value={form.property_type} editing={editing} type="select" options={propertyTypeOptions} onChange={v => f('property_type', v)} />
+                    <HeaderField label="Property Subtype" value={form.property_subtype} editing={editing} onChange={v => f('property_subtype', v)} />
+                  </>
+                ) : (
+                  <>
+                    {form.property_type && (
+                      <span style={{ background: '#dbeafe', color: '#1e40af', borderRadius: 20, padding: '3px 12px', fontSize: 12, fontWeight: 600 }}>{form.property_type}</span>
+                    )}
+                    {form.property_subtype && (
+                      <span style={{ background: '#f1f5f9', color: '#475569', borderRadius: 20, padding: '3px 12px', fontSize: 12, fontWeight: 600 }}>{form.property_subtype}</span>
+                    )}
+                  </>
                 )}
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
@@ -619,18 +682,44 @@ export function PropertyDetail() {
             {/* Row 2: Name + Address + Owner | Photo + Map */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                <h1 style={{ fontSize: 28, fontWeight: 800, color: '#1e293b', margin: '0 0 4px 0', lineHeight: 1.2 }}>
-                  {form.property_name || form.address || 'Unnamed Property'}
-                </h1>
-                {/* Address line */}
-                {(form.city || form.state || form.zipcode) && (
-                  <p style={{ margin: '0 0 2px', fontSize: 13, color: '#64748b' }}>
-                    📍 {[form.city, form.state, form.zipcode].filter(Boolean).join(', ')}
-                  </p>
+                {/* Property Name — editable when in edit mode */}
+                {editing ? (
+                  <div style={{ marginBottom: 8 }}>
+                    <HeaderField
+                      label="Property Name"
+                      value={form.property_name}
+                      editing={editing}
+                      onChange={v => f('property_name', v)}
+                      inputStyle={{ fontSize: 18, fontWeight: 700, width: '100%', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                ) : (
+                  <h1 style={{ fontSize: 28, fontWeight: 800, color: '#1e293b', margin: '0 0 4px 0', lineHeight: 1.2 }}>
+                    {form.property_name || form.address || 'Unnamed Property'}
+                  </h1>
                 )}
-                {form.address && (form.city || form.state) && (
-                  <p style={{ margin: '0 0 10px', fontSize: 12, color: '#94a3b8' }}>{form.address}</p>
+
+                {/* Address — editable inline when editing */}
+                {editing ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 12px', marginBottom: 10 }}>
+                    <HeaderField label="Street Address" value={form.address} editing={editing} onChange={v => f('address', v)} inputStyle={{ width: '100%', boxSizing: 'border-box' }} />
+                    <HeaderField label="City" value={form.city} editing={editing} onChange={v => f('city', v)} inputStyle={{ width: '100%', boxSizing: 'border-box' }} />
+                    <HeaderField label="State" value={form.state} editing={editing} onChange={v => f('state', v)} inputStyle={{ width: '100%', boxSizing: 'border-box' }} />
+                    <HeaderField label="Zipcode" value={form.zipcode} editing={editing} onChange={v => f('zipcode', v)} inputStyle={{ width: '100%', boxSizing: 'border-box' }} />
+                  </div>
+                ) : (
+                  <>
+                    {(form.city || form.state || form.zipcode) && (
+                      <p style={{ margin: '0 0 2px', fontSize: 13, color: '#64748b' }}>
+                        📍 {[form.city, form.state, form.zipcode].filter(Boolean).join(', ')}
+                      </p>
+                    )}
+                    {form.address && (form.city || form.state) && (
+                      <p style={{ margin: '0 0 10px', fontSize: 12, color: '#94a3b8' }}>{form.address}</p>
+                    )}
+                  </>
                 )}
+
                 {/* Owner Contact + Company — directly under address */}
                 {primaryContact && (
                   <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 10, marginTop: 4, display: 'flex', flexDirection: 'column', gap: 5 }}>
@@ -685,51 +774,54 @@ export function PropertyDetail() {
             </div>
 
             {/* ── Stats Strip ─────────────────────────────────────────────── */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 0, borderTop: '1px solid #e2e8f0', paddingTop: 14, marginTop: 20 }}>
-              <StatCell label="Property Type"    value={form.property_type} />
-              <StatCell label="Property Subtype" value={form.property_subtype} />
-              <StatCell label="Parcel ID"         value={form.parcel_id} />
-              <StatCell label="Total Bldg SF"     value={form.total_building_sqft ? fmt.number(form.total_building_sqft) + ' SF' : null} color="#1e40af" />
-              <StatCell label="Total Units"       value={calcTotalUnits > 0 ? calcTotalUnits : null} />
-              <StatCell label="Year Built / Reno" value={[form.year_built, form.year_renovated].filter(Boolean).join(' / ') || null} />
-              <StatCell label="Last Sale Price"   value={form.sales_price ? fmt.currency(form.sales_price) : null} color="#f59e0b" />
-              <StatCell label="Last Sale Date"    value={form.sale_date ? fmt.date(form.sale_date) : null} />
-            </div>
+            {editing ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px 16px', borderTop: '1px solid #e2e8f0', paddingTop: 14, marginTop: 20 }}>
+                <HeaderField label="Parcel ID" value={form.parcel_id} editing={editing} onChange={v => f('parcel_id', v)} inputStyle={{ width: '100%', boxSizing: 'border-box' }} />
+                <HeaderField label="Total Bldg SQ FT" value={form.total_building_sqft != null ? String(form.total_building_sqft) : ''} editing={editing} onChange={v => f('total_building_sqft', v ? parseFloat(v) : null)} inputStyle={{ width: '100%', boxSizing: 'border-box' }} />
+                <HeaderField label="Year Built" value={form.year_built != null ? String(form.year_built) : ''} editing={editing} onChange={v => f('year_built', v ? parseInt(v) : null)} inputStyle={{ width: '100%', boxSizing: 'border-box' }} />
+                <HeaderField label="Year Renovated" value={form.year_renovated != null ? String(form.year_renovated) : ''} editing={editing} onChange={v => f('year_renovated', v ? parseInt(v) : null)} inputStyle={{ width: '100%', boxSizing: 'border-box' }} />
+                <HeaderField label="Last Sale Price" value={form.sales_price != null ? String(form.sales_price) : ''} editing={editing} onChange={v => f('sales_price', v ? parseFloat(v) : null)} inputStyle={{ width: '100%', boxSizing: 'border-box' }} />
+                <HeaderField label="Last Sale Date" value={form.sale_date} editing={editing} type="date" onChange={v => f('sale_date', v)} inputStyle={{ width: '100%', boxSizing: 'border-box' }} />
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 0, borderTop: '1px solid #e2e8f0', paddingTop: 14, marginTop: 20 }}>
+                <StatCell label="Property Type"    value={form.property_type} />
+                <StatCell label="Property Subtype" value={form.property_subtype} />
+                <StatCell label="Parcel ID"         value={form.parcel_id} />
+                <StatCell label="Total Bldg SF"     value={form.total_building_sqft ? fmt.number(form.total_building_sqft) + ' SF' : null} color="#1e40af" />
+                <StatCell label="Total Units"       value={calcTotalUnits > 0 ? calcTotalUnits : null} />
+                <StatCell label="Year Built / Reno" value={[form.year_built, form.year_renovated].filter(Boolean).join(' / ') || null} />
+                <StatCell label="Last Sale Price"   value={form.sales_price ? fmt.currency(form.sales_price) : null} color="#f59e0b" />
+                <StatCell label="Last Sale Date"    value={form.sale_date ? fmt.date(form.sale_date) : null} />
+              </div>
+            )}
           </div>
         </div>
 
-        {/* ── Detail Tabs + Side Panels ────────────────────────────────────── */}
-        <div style={{ display: 'flex', gap: '24px' }}>
-          <div style={{ flex: 1, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '20px 24px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-            {/* Tab bar */}
-            <div style={{ display: 'flex', gap: '2px', borderBottom: '1px solid #e2e8f0', marginBottom: '24px', flexWrap: 'wrap' }}>
-              {tabs.map(tab => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  style={{
-                    background: 'none', border: 'none',
-                    padding: '9px 12px', marginBottom: '-1px',
-                    borderBottom: activeTab === tab ? '2px solid #1e40af' : '2px solid transparent',
-                    color: activeTab === tab ? '#1e40af' : '#64748b',
-                    fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                    borderRadius: '4px 4px 0 0',
-                    transition: 'color 0.15s',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-            <TabContent />
+        {/* ── Detail Tabs (full width — no sidebar) ────────────────────────── */}
+        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '20px 24px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+          {/* Tab bar */}
+          <div style={{ display: 'flex', gap: '2px', borderBottom: '1px solid #e2e8f0', marginBottom: '24px', flexWrap: 'wrap' }}>
+            {tabs.map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                style={{
+                  background: 'none', border: 'none',
+                  padding: '9px 12px', marginBottom: '-1px',
+                  borderBottom: activeTab === tab ? '2px solid #1e40af' : '2px solid transparent',
+                  color: activeTab === tab ? '#1e40af' : '#64748b',
+                  fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                  borderRadius: '4px 4px 0 0',
+                  transition: 'color 0.15s',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {tab}
+              </button>
+            ))}
           </div>
-
-          {/* Right panels */}
-          <div style={{ width: '300px', flexShrink: 0 }}>
-            <PropertyContactsPanel propertyId={id} isAdmin={isAdmin} />
-            <AppealsPanel propertyId={id} />
-          </div>
+          <TabContent />
         </div>
 
       </div>
