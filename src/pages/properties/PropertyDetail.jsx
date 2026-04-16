@@ -1048,6 +1048,15 @@ export function PropertyDetail() {
                     )}
                   </div>
                 </div>
+
+                {/* Property Type / Subtype / Parcel ID row */}
+                {!editing && (
+                  <div style={{ display: 'flex', gap: 24, marginTop: 12, paddingTop: 10, borderTop: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
+                    <StatCell label="Property Type"    value={form.property_type} />
+                    <StatCell label="Property Subtype" value={form.property_subtype} />
+                    <StatCell label="Parcel ID"         value={form.parcel_id} />
+                  </div>
+                )}
               </div>
 
               {/* Photo + Map */}
@@ -1076,9 +1085,6 @@ export function PropertyDetail() {
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 0, borderTop: '1px solid #e2e8f0', paddingTop: 14, marginTop: 20 }}>
-                <StatCell label="Property Type"    value={form.property_type} />
-                <StatCell label="Property Subtype" value={form.property_subtype} />
-                <StatCell label="Parcel ID"         value={form.parcel_id} />
                 <StatCell label="Total Bldg SF"     value={form.total_building_sqft ? fmt.number(form.total_building_sqft) + ' SF' : ''} color="#1e40af" />
                 <StatCell label="Total Units"       value={calcTotalUnits > 0 ? calcTotalUnits : ''} />
                 <StatCell label="Year Built / Reno" value={[form.year_built, form.year_renovated].filter(Boolean).join(' / ') || ''} />
