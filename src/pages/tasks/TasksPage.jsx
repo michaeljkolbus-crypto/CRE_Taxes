@@ -44,6 +44,15 @@ export default function TasksPage() {
     }
   }
 
+  async function deleteTask(taskId) {
+    const { error } = await supabase.from('tasks').delete().eq('id', taskId)
+    if (!error) {
+      setTasks(prev => prev.filter(t => t.id !== taskId))
+    } else {
+      console.error(error)
+    }
+  }
+
   async function addTask(formData) {
     const { error } = await supabase.from('tasks').insert([formData])
     if (!error) {
@@ -123,13 +132,14 @@ export default function TasksPage() {
                 <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#1e293b' }}>Linked To</th>
                 <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#1e293b' }}>Created</th>
                 <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600', color: '#1e293b' }}>Status</th>
+                <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600', color: '#1e293b' }}></th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={5} style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>Loading...</td></tr>
+                <tr><td colSpan={6} style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>Loading...</td></tr>
               ) : tasks.length === 0 ? (
-                <tr><td colSpan={5} style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>No tasks found</td></tr>
+                <tr><td colSpan={6} style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>No tasks found</td></tr>
               ) : (
                 tasks.map(task => {
                   const dueDate = task.due_date ? new Date(task.due_date) : null
@@ -188,6 +198,27 @@ export default function TasksPage() {
                           {isCompleted ? 'Done' : 'Complete'}
                         </button>
                       </td>
+                      <td style={{ padding: '12px', textAlign: 'center' }}>
+                        <button
+                          onClick={() => deleteTask(task.id)}
+                          title="Delete task"
+                          style={{
+                            padding: '4px 8px',
+                            backgroundColor: 'transparent',
+                            color: '#94a3b8',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            fontWeight: '500',
+                            transition: 'all 0.15s'
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#fee2e2'; e.currentTarget.style.color = '#dc2626'; e.currentTarget.style.borderColor = '#fca5a5' }}
+                          onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#94a3b8'; e.currentTarget.style.borderColor = '#e2e8f0' }}
+                        >
+                          ✕
+                        </button>
+                      </td>
                     </tr>
                   )
                 })
@@ -204,13 +235,15 @@ export default function TasksPage() {
 
 function AddTaskModal({ onClose, onAdd, properties }) {
   const [formData, setFormData] = useState({})
+  const [titleError, setTitleError] = useState(false)
 
   const handleSubmit = (e) => {
     e.preventDefault()
     if (!formData.title) {
-      alert('Title is required')
+      setTitleError(true)
       return
     }
+    setTitleError(false)
     onAdd(formData)
   }
 
@@ -231,9 +264,10 @@ function AddTaskModal({ onClose, onAdd, properties }) {
                 type="text"
                 required
                 value={formData.title || ''}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                style={{ width: '100%', padding: '8px', border: '1px solid #e2e8f0', borderRadius: '4px', fontSize: '14px', boxSizing: 'border-box' }}
+                onChange={(e) => { setFormData({ ...formData, title: e.target.value }); setTitleError(false) }}
+                style={{ width: '100%', padding: '8px', border: `1px solid ${titleError ? '#dc2626' : '#e2e8f0'}`, borderRadius: '4px', fontSize: '14px', boxSizing: 'border-box' }}
               />
+              {titleError && <p style={{ margin: '4px 0 0 0', fontSize: 12, color: '#dc2626' }}>Title is required</p>}
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: '#64748b', marginBottom: '4px' }}>
