@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
-import Navbar from './components/shared/Navbar'
+import TopBar from './components/shared/TopBar'
+import Sidebar from './components/shared/Sidebar'
 import LoginPage from './pages/LoginPage'
 import PropertiesPage from './pages/properties/PropertiesPage'
 import PropertyDetail from './pages/properties/PropertyDetail'
@@ -13,20 +14,28 @@ import AppealDetail from './pages/appeals/AppealDetail'
 import CompsPage from './pages/comps/CompsPage'
 import TasksPage from './pages/tasks/TasksPage'
 import SettingsPage from './pages/settings/SettingsPage'
+import UserProfilePage from './pages/profile/UserProfilePage'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
-  if (loading) return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', fontSize:14, color:'#64748b' }}>Loading...</div>
+  if (loading) return (
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', fontSize:14, color:'#64748b' }}>
+      Loading...
+    </div>
+  )
   return user ? children : <Navigate to="/login" replace />
 }
 
 function Layout({ children }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <Navbar />
-      <main style={{ flex: 1, padding: '24px', maxWidth: 1400, margin: '0 auto', width: '100%' }}>
-        {children}
-      </main>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+      <TopBar />
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        <Sidebar />
+        <main style={{ flex: 1, overflowY: 'auto', background: '#f8fafc' }}>
+          {children}
+        </main>
+      </div>
     </div>
   )
 }
@@ -47,6 +56,7 @@ function AppRoutes() {
       <Route path="/comps" element={<PrivateRoute><Layout><CompsPage /></Layout></PrivateRoute>} />
       <Route path="/tasks" element={<PrivateRoute><Layout><TasksPage /></Layout></PrivateRoute>} />
       <Route path="/settings" element={<PrivateRoute><Layout><SettingsPage /></Layout></PrivateRoute>} />
+      <Route path="/profile" element={<PrivateRoute><Layout><UserProfilePage /></Layout></PrivateRoute>} />
     </Routes>
   )
 }

@@ -267,26 +267,14 @@ export default function AppealsPage() {
   const totalPages = Math.ceil(count / pagination.pageSize)
 
   return (
-    <div style={{ padding: '24px', background: '#f8fafc', minHeight: '100vh' }}>
-      <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 style={{ margin: 0, fontSize: '24px', fontWeight: '700', color: '#1e293b' }}>
-          Appeals ({count})
-        </h1>
-        <button
-          onClick={() => setView('pipeline')}
-          style={{
-            padding: '8px 12px',
-            background: '#1e40af',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '14px'
-          }}
-        >
-          Pipeline View
-        </button>
-      </div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <RecordToolbar
+        title="Appeals"
+        count={count}
+        addLabel="Pipeline View"
+        onAdd={() => setView('pipeline')}
+      />
+      <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
 
       {/* Filters */}
       <div style={{
@@ -491,5 +479,6 @@ export default function AppealsPage() {
         </div>
       )}
     </div>
+      </div>
   )
 }

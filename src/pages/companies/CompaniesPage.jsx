@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { fmt } from '../../lib/theme'
+import RecordToolbar from '../../components/shared/RecordToolbar'
 
 const PAGE_SIZE = 50
 
@@ -15,6 +16,7 @@ export default function CompaniesPage() {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(false)
   const [showModal, setShowModal] = useState(false)
+  const [selectedIds, setSelectedIds] = useState([])
   const [form, setForm] = useState({
     company_name: '',
     company_type: '',
@@ -82,52 +84,25 @@ export default function CompaniesPage() {
   const from = page * PAGE_SIZE + 1
   const to = Math.min((page + 1) * PAGE_SIZE, total)
 
+  function handleExport() {
+    const header = 'Company Name,Type,Phone,City'
+    const rows = companies.map(c => [c.company_name||'', c.company_type||'', c.company_phone||'', c.city||''].join(','))
+    const csv = [header, ...rows].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url; a.download = 'companies.csv'; a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
-    <div style={{ padding: '24px', backgroundColor: '#f8fafc', minHeight: '100vh' }}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <h1 style={{ ...fmt.h1, margin: 0 }}>
-            Companies ({total})
-          </h1>
-          <button
-            onClick={() => setShowModal(true)}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#1e40af',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: '500'
-            }}
-          >
-            + Add Company
-          </button>
-        </div>
-
-        {/* Search */}
-        <div style={{ marginBottom: '20px' }}>
-          <input
-            type="text"
-            placeholder="Search by company name or city..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setPage(0)
-            }}
-            style={{
-              width: '100%',
-              padding: '10px 12px',
-              border: '1px solid #e2e8f0',
-              borderRadius: '6px',
-              fontSize: '14px'
-            }}
-          />
-        </div>
-
-        {/* Table */}
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <RecordToolbar title="Companies" count={total} onAdd={() => setShowModal(true)} addLabel="+ Add Company" onExport={handleExport} selectedIds={selectedIds} />
+      <div style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', padding: '10px 24px' }}>
+        <input type="text" placeholder="Search by company name or city..." value={search}
+          onChange={e => { setSearch(e.target.value); setPage(0) }}
+          style={{ border:'1px solid #d1d5db', borderRadius:8, padding:'6px 12px', width:280, fontSize:13 }} />
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
         <div style={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0 }}>
@@ -202,16 +177,7 @@ export default function CompaniesPage() {
         </div>
 
         {/* Pagination */}
-        <div
-          style={{
-            marginTop: '16px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            fontSize: '12px',
-            color: '#64748b'
-          }}
-        >
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:16, fontSize:12, color:'#64748b' }}>
           <span>
             {total > 0 ? `Showing ${from}-${to} of ${total} records` : 'No records'}
           </span>
