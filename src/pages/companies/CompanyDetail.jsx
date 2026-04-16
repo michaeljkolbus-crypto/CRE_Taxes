@@ -132,10 +132,16 @@ export default function CompanyDetail() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [company, setCompany] = useState(null)
+  const [linkedContacts, setLinkedContacts] = useState([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({})
   const [saving, setSaving] = useState(false)
+  // Contact linking
+  const [contactSearch, setContactSearch] = useState('')
+  const [contactResults, setContactResults] = useState([])
+  const [showContactDropdown, setShowContactDropdown] = useState(false)
+  const [linking, setLinking] = useState(false)
 
   // ── Views / layout ───────────────────────────────────────────────────────
   const { views, saveView, deleteView } = useViewPreferences('company_detail')
@@ -166,13 +172,45 @@ export default function CompanyDetail() {
 
   const visibleTabs = tabConfig.filter(t => t.visible)
 
-  useEffect(() => { fetchCompany() }, [id])
+  useEffect(() => { fetchCompany(); fetchLinkedContacts() }, [id])
 
   const fetchCompany = async () => {
     setLoading(true)
     const { data, error } = await supabase.from('companies').select('*').eq('id', id).single()
     if (error) { console.error(error); setLoading(false); return }
     setCompany(data); setForm(data); setLoading(false)
+  }
+
+  const fetchLinkedContacts = async () => {
+    const { data } = await supabase.from('contacts')
+      .select('id, first_name, last_name, contact_type, main_phone, email_address')
+      .eq('company_id', id)
+      .order('last_name', { ascending: true })
+    setLinkedContacts(data || [])
+  }
+
+  const searchContacts = async (q) => {
+    if (!q.trim()) { setContactResults([]); return }
+    const { data } = await supabase.from('contacts')
+      .select('id, first_name, last_name, contact_type')
+      .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%`)
+      .limit(8)
+    // Exclude already-linked contacts
+    setContactResults((data || []).filter(c => !linkedContacts.find(lc => lc.id === c.id)))
+  }
+
+  const handleLinkContact = async (contact) => {
+    setLinking(true)
+    const { error } = await supabase.from('contacts').update({ company_id: id }).eq('id', contact.id)
+    if (!error) {
+      setLinkedContacts(prev => [...prev, contact].sort((a, b) => (a.last_name || '').localeCompare(b.last_name || '')))
+    }
+    setContactSearch(''); setContactResults([]); setShowContactDropdown(false); setLinking(false)
+  }
+
+  const handleUnlinkContact = async (contactId) => {
+    const { error } = await supabase.from('contacts').update({ company_id: null }).eq('id', contactId)
+    if (!error) setLinkedContacts(prev => prev.filter(c => c.id !== contactId))
   }
 
   const handleSave = async () => {
@@ -363,8 +401,78 @@ export default function CompanyDetail() {
             {/* Linked Contacts tab */}
             {activeTab === 'LinkedContacts' && (
               <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '20px', marginBottom: 20 }}>
-                <SH title="Linked Contacts" />
-                <p style={{ margin: 0, fontSize: 13, color: '#64748b', fontStyle: 'italic' }}>Contact linking — coming in next phase</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <SH title={`Linked Contacts (${linkedContacts.length})`} />
+                </div>
+
+                {/* ── Typeahead to link a new contact ── */}
+                <div style={{ position: 'relative', marginBottom: 20, maxWidth: 360 }}>
+                  <input type="text" value={contactSearch}
+                    onChange={e => { setContactSearch(e.target.value); searchContacts(e.target.value); setShowContactDropdown(true) }}
+                    onBlur={() => setTimeout(() => setShowContactDropdown(false), 150)}
+                    placeholder="Search contacts to link…"
+                    style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, boxSizing: 'border-box' }} />
+                  {showContactDropdown && contactResults.length > 0 && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 200, maxHeight: 220, overflowY: 'auto' }}>
+                      {contactResults.map(c => (
+                        <div key={c.id}
+                          onMouseDown={() => handleLinkContact(c)}
+                          style={{ padding: '9px 14px', cursor: 'pointer', fontSize: 13, color: '#1e293b', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                          onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                          <span>{c.first_name} {c.last_name}</span>
+                          {c.contact_type && <span style={{ fontSize: 11, background: '#dbeafe', color: '#1e40af', padding: '1px 7px', borderRadius: 12, fontWeight: 600 }}>{c.contact_type}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* ── Linked contacts list ── */}
+                {linkedContacts.length === 0 ? (
+                  <p style={{ margin: 0, fontSize: 13, color: '#94a3b8', fontStyle: 'italic' }}>No contacts linked to this company yet. Search above to link one.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {linkedContacts.map(c => (
+                      <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                        {/* Avatar */}
+                        <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#dbeafe', color: '#1e40af', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
+                          {((c.first_name?.[0] || '') + (c.last_name?.[0] || '')).toUpperCase() || '?'}
+                        </div>
+                        {/* Info */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span onClick={() => navigate(`/contacts/${c.id}`)}
+                              style={{ fontSize: 14, fontWeight: 600, color: '#1e293b', cursor: 'pointer' }}
+                              onMouseEnter={e => e.currentTarget.style.color = '#1e40af'}
+                              onMouseLeave={e => e.currentTarget.style.color = '#1e293b'}>
+                              {c.first_name} {c.last_name}
+                            </span>
+                            {c.contact_type && (
+                              <span style={{ fontSize: 11, background: '#dbeafe', color: '#1e40af', padding: '1px 8px', borderRadius: 12, fontWeight: 600, flexShrink: 0 }}>{c.contact_type}</span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 12, color: '#64748b', marginTop: 2, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                            {c.main_phone && <span>{c.main_phone}</span>}
+                            {c.email_address && <span>{c.email_address}</span>}
+                          </div>
+                        </div>
+                        {/* Actions */}
+                        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                          <button onClick={() => navigate(`/contacts/${c.id}`)}
+                            style={{ padding: '4px 10px', background: '#1e40af', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                            View →
+                          </button>
+                          <button onClick={() => handleUnlinkContact(c.id)}
+                            style={{ padding: '4px 8px', background: '#fff', color: '#ef4444', border: '1px solid #fecaca', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}
+                            title="Unlink contact">
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 

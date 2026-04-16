@@ -10,6 +10,7 @@ const PAGE_SIZE = 50
 
 const ALL_COLUMNS = [
   { key: 'full_name',        label: 'Name',          visible: true  },
+  { key: 'company_name',     label: 'Company',        visible: true  },
   { key: 'main_phone',       label: 'Phone',          visible: true  },
   { key: 'email_address',    label: 'Email',          visible: true  },
   { key: 'contact_type',     label: 'Contact Type',   visible: true  },
@@ -44,7 +45,7 @@ export default function ContactsPage() {
     setLoading(true)
     const from = page * PAGE_SIZE
     const to   = from + PAGE_SIZE - 1
-    let query = supabase.from('contacts').select('*', { count: 'exact' })
+    let query = supabase.from('contacts').select('*, company:companies(id, company_name)', { count: 'exact' })
     if (search) {
       query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email_address.ilike.%${search}%,main_phone.ilike.%${search}%`)
     }
@@ -110,6 +111,7 @@ export default function ContactsPage() {
     const rows = contacts.map(contact =>
       visibleCols.map(col => {
         if (col.key === 'full_name') return `${contact.first_name || ''} ${contact.last_name || ''}`.trim()
+        if (col.key === 'company_name') return contact.company?.company_name || ''
         const v = contact[col.key]
         return v == null ? '' : String(v).replace(/,/g, ';')
       }).join(',')
@@ -153,6 +155,7 @@ export default function ContactsPage() {
             <thead style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0 }}>
               <tr>
                 {visCol('full_name')        && <th style={{ ...fmt.th, textAlign: 'left', padding: '12px 16px' }}>Name</th>}
+                {visCol('company_name')     && <th style={{ ...fmt.th, padding: '12px 16px' }}>Company</th>}
                 {visCol('main_phone')       && <th style={{ ...fmt.th, padding: '12px 16px' }}>Phone</th>}
                 {visCol('email_address')    && <th style={{ ...fmt.th, padding: '12px 16px' }}>Email</th>}
                 {visCol('contact_type')     && <th style={{ ...fmt.th, padding: '12px 16px' }}>Contact Type</th>}
@@ -169,6 +172,7 @@ export default function ContactsPage() {
                   style={{ backgroundColor: idx % 2 === 0 ? '#fff' : '#f8fafc', borderBottom: '1px solid #e2e8f0', cursor: 'pointer' }}
                   onClick={() => navigate(`/contacts/${contact.id}`)}>
                   {visCol('full_name')     && <td style={{ ...fmt.td, textAlign: 'left', padding: '12px 16px' }}>{contact.first_name} {contact.last_name}</td>}
+                  {visCol('company_name')  && <td style={{ ...fmt.td, padding: '12px 16px' }}>{contact.company?.company_name || '—'}</td>}
                   {visCol('main_phone')    && <td style={{ ...fmt.td, padding: '12px 16px' }}>{contact.main_phone || '—'}</td>}
                   {visCol('email_address') && <td style={{ ...fmt.td, padding: '12px 16px' }}>{contact.email_address || '—'}</td>}
                   {visCol('contact_type')  && <td style={{ ...fmt.td, padding: '12px 16px' }}>{contact.contact_type || '—'}</td>}
