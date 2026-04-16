@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { fmt } from '../../lib/theme'
 import RecordToolbar from '../../components/shared/RecordToolbar'
 import { useViewPreferences } from '../../hooks/useViewPreferences'
+import { useAuth } from '../../context/AuthContext'
 
 const APPEAL_PROP_TYPES = ['Commercial', 'Industrial', 'Duplex', 'Residential', 'Farmland']
 
@@ -93,6 +94,10 @@ const ALL_COLUMNS = [
   { key: 'parcel_id4',               label: 'Parcel ID 4',           visible: false, type: 'mono' },
   { key: 'parcel_id5',               label: 'Parcel ID 5',           visible: false, type: 'mono' },
   { key: 'misc_parcels',             label: 'Misc Parcels',          visible: false, type: 'text' },
+  // ── Record Tracking ───────────────────────────────────────────────────────
+  { key: 'verified',         label: 'Verified',      visible: false, type: 'verified' },
+  { key: 'last_modified_by', label: 'Modified By',   visible: false, type: 'text' },
+  { key: 'updated_at',       label: 'Last Modified', visible: false, type: 'date' },
 ]
 
 const MASS_REPLACE_FIELDS = [
@@ -104,7 +109,7 @@ const MASS_REPLACE_FIELDS = [
 ]
 
 // ── Render a table cell for a given column ────────────────────────────────
-function CellValue({ col, prop, navigate }) {
+function CellValue({ col, prop, navigate, onToggleVerified }) {
   const v = prop[col.key]
 
   if (col.key === 'address') {
@@ -122,6 +127,18 @@ function CellValue({ col, prop, navigate }) {
         {v
           ? <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 99, background: '#f0fdf4', color: '#16a34a', fontWeight: 600 }}>{v}</span>
           : <span style={{ color: '#94a3b8', fontSize: 13 }}>—</span>}
+      </td>
+    )
+  }
+
+  if (col.key === 'verified') {
+    return (
+      <td style={{ padding: '10px 12px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+        <button onClick={() => onToggleVerified && onToggleVerified(prop)}
+          style={{ padding: '3px 10px', borderRadius: 99, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 700,
+            background: prop.verified ? '#dcfce7' : '#f1f5f9', color: prop.verified ? '#16a34a' : '#94a3b8' }}>
+          {prop.verified ? '✓ Verified' : 'Verify'}
+        </button>
       </td>
     )
   }
@@ -275,6 +292,7 @@ function MapView({ properties }) {
 
 export function PropertiesPage() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [properties, setProperties] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -390,6 +408,16 @@ export function PropertiesPage() {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
 
+  const toggleVerified = async (prop) => {
+    const newVal = !prop.verified
+    const now = new Date().toISOString()
+    const modifiedBy = user?.user_metadata?.full_name || user?.email || ''
+    const { error } = await supabase.from('properties').update({ verified: newVal, updated_at: now, last_modified_by: modifiedBy }).eq('id', prop.id)
+    if (!error) {
+      setProperties(prev => prev.map(p => p.id === prop.id ? { ...p, verified: newVal, updated_at: now, last_modified_by: modifiedBy } : p))
+    }
+  }
+
   const visibleCols = columns.filter(c => c.visible)
   const counties = ['Peoria', 'Tazewell', 'Woodford', 'Other']
   const propertyTypes = ['Residential', 'Commercial', 'Industrial', 'Mixed-Use', 'Agricultural']
@@ -502,7 +530,7 @@ export function PropertiesPage() {
                       <input type="checkbox" checked={selectedIds.includes(prop.id)} onChange={() => toggleSelect(prop.id)} style={{ cursor: 'pointer', accentColor: '#1e40af' }} />
                     </td>
                     {visibleCols.map(col => (
-                      <CellValue key={col.key} col={col} prop={prop} navigate={navigate} />
+                      <CellValue key={col.key} col={col} prop={prop} navigate={navigate} onToggleVerified={toggleVerified} />
                     ))}
                     <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                       <button onClick={() => navigate(`/properties/${prop.id}`)} style={{ background: 'none', border: 'none', color: '#1e40af', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>View</button>

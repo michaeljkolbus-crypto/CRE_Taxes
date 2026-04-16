@@ -3,8 +3,9 @@ import { supabase } from '../../lib/supabase'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { PhotoGallery } from '../../components/shared/PhotoGallery'
+import { useViewPreferences } from '../../hooks/useViewPreferences'
 
-// ── Read-only field ────────────────────────────────────────────────────────
+// ── Shared helpers ─────────────────────────────────────────────────────────
 function ReadField({ label, value, href }) {
   return (
     <div style={{ padding: '8px 0', borderBottom: '1px solid #f1f5f9' }}>
@@ -17,7 +18,6 @@ function ReadField({ label, value, href }) {
   )
 }
 
-// ── Editable field ─────────────────────────────────────────────────────────
 function EditField({ label, value, type = 'text', onChange, options }) {
   return (
     <div style={{ marginBottom: 12 }}>
@@ -25,51 +25,139 @@ function EditField({ label, value, type = 'text', onChange, options }) {
         {label}
       </label>
       {type === 'select' ? (
-        <select
-          value={value || ''}
-          onChange={e => onChange(e.target.value)}
-          style={{ width: '100%', padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, boxSizing: 'border-box', background: '#fff' }}
-        >
+        <select value={value || ''} onChange={e => onChange(e.target.value)}
+          style={{ width: '100%', padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, boxSizing: 'border-box', background: '#fff' }}>
           <option value="">—</option>
           {options?.map(o => <option key={o} value={o}>{o}</option>)}
         </select>
       ) : type === 'textarea' ? (
-        <textarea
-          value={value || ''}
-          onChange={e => onChange(e.target.value)}
-          rows={3}
-          style={{ width: '100%', padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', minHeight: 80 }}
-        />
+        <textarea value={value || ''} onChange={e => onChange(e.target.value)} rows={3}
+          style={{ width: '100%', padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', minHeight: 80 }} />
       ) : (
-        <input
-          type={type}
-          value={value || ''}
-          onChange={e => onChange(e.target.value)}
-          style={{ width: '100%', padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }}
-        />
+        <input type={type} value={value || ''} onChange={e => onChange(e.target.value)}
+          style={{ width: '100%', padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
       )}
     </div>
   )
 }
 
-// ── Collapsible section ────────────────────────────────────────────────────
-function Section({ title, children, defaultOpen = true }) {
-  const [open, setOpen] = useState(defaultOpen)
+function SH({ title }) {
   return (
-    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-      <button
-        onClick={() => setOpen(o => !o)}
-        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', background: 'none', border: 'none', cursor: 'pointer', borderBottom: open ? '1px solid #e2e8f0' : 'none' }}
-      >
-        <span style={{ fontSize: 11, fontWeight: 800, color: '#1e40af', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{title}</span>
-        <span style={{ fontSize: 16, color: '#94a3b8', transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', lineHeight: 1 }}>⌄</span>
+    <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 800, color: '#1e40af', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{title}</p>
+  )
+}
+
+// ── Tab definitions ────────────────────────────────────────────────────────
+const ALL_TABS = [
+  { id: 'Details',            label: 'Details' },
+  { id: 'LinkedProperties',   label: 'Linked Properties' },
+]
+const DEFAULT_TAB_CONFIG = ALL_TABS.map(t => ({ ...t, visible: true }))
+
+// ── ViewsBar ───────────────────────────────────────────────────────────────
+function ViewsBar({ views, activeViewId, onLoadView, onEditLayout }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0 14px', borderBottom: '1px solid #e2e8f0', marginBottom: 16 }}>
+      {views.length > 0 && (
+        <select
+          value={activeViewId || ''}
+          onChange={e => {
+            const v = views.find(v => v.id === e.target.value)
+            if (v) onLoadView(v.id, v.config)
+          }}
+          style={{ padding: '5px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 12, color: '#1e293b', background: '#fff', cursor: 'pointer' }}
+        >
+          <option value="">— Default Layout —</option>
+          {views.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+        </select>
+      )}
+      <button onClick={onEditLayout}
+        style={{ padding: '5px 12px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 12, fontWeight: 600, color: '#475569', cursor: 'pointer' }}>
+        ⚙ Edit Layout
       </button>
-      {open && <div style={{ padding: '16px 20px' }}>{children}</div>}
+      {activeViewId && (
+        <span style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic' }}>
+          {views.find(v => v.id === activeViewId)?.name}
+        </span>
+      )}
     </div>
   )
 }
 
-// ── CONTACT TYPE OPTIONS ───────────────────────────────────────────────────
+// ── EditLayoutModal ────────────────────────────────────────────────────────
+function EditLayoutModal({ tabConfig, views, onSave, onDelete, onClose }) {
+  const [tabs, setTabs] = useState(tabConfig.map(t => ({ ...t })))
+  const [newViewName, setNewViewName] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const move = (i, dir) => {
+    const next = [...tabs]
+    const swap = i + dir
+    if (swap < 0 || swap >= next.length) return
+    ;[next[i], next[swap]] = [next[swap], next[i]]
+    setTabs(next)
+  }
+
+  const handleSave = async () => {
+    if (!newViewName.trim()) return
+    setSaving(true)
+    await onSave(newViewName.trim(), { tabs })
+    setSaving(false)
+    setNewViewName('')
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
+      <div style={{ background: '#fff', borderRadius: 14, padding: 28, width: 420, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#1e293b' }}>Edit Layout</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#94a3b8', lineHeight: 1 }}>✕</button>
+        </div>
+
+        <p style={{ margin: '0 0 14px', fontSize: 12, color: '#64748b' }}>Show/hide and reorder tabs. Save as a named view.</p>
+
+        {tabs.map((tab, i) => (
+          <div key={tab.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: '#f8fafc', borderRadius: 8, marginBottom: 8 }}>
+            <input type="checkbox" checked={tab.visible} onChange={e => setTabs(tabs.map((t, idx) => idx === i ? { ...t, visible: e.target.checked } : t))}
+              style={{ cursor: 'pointer', accentColor: '#1e40af', width: 15, height: 15 }} />
+            <span style={{ flex: 1, fontSize: 13, color: '#1e293b', fontWeight: 500 }}>{tab.label}</span>
+            <button onClick={() => move(i, -1)} disabled={i === 0} style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: 4, padding: '2px 7px', cursor: i === 0 ? 'not-allowed' : 'pointer', fontSize: 12, color: '#475569', opacity: i === 0 ? 0.4 : 1 }}>↑</button>
+            <button onClick={() => move(i, 1)} disabled={i === tabs.length - 1} style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: 4, padding: '2px 7px', cursor: i === tabs.length - 1 ? 'not-allowed' : 'pointer', fontSize: 12, color: '#475569', opacity: i === tabs.length - 1 ? 0.4 : 1 }}>↓</button>
+          </div>
+        ))}
+
+        <div style={{ borderTop: '1px solid #e2e8f0', marginTop: 20, paddingTop: 20 }}>
+          <p style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Save as Named View</p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input value={newViewName} onChange={e => setNewViewName(e.target.value)} placeholder="e.g. My Contact View"
+              style={{ flex: 1, padding: '7px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
+            <button onClick={handleSave} disabled={saving || !newViewName.trim()}
+              style={{ padding: '7px 14px', background: '#1e40af', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: saving || !newViewName.trim() ? 'not-allowed' : 'pointer', opacity: saving || !newViewName.trim() ? 0.5 : 1 }}>
+              {saving ? '…' : 'Save'}
+            </button>
+          </div>
+        </div>
+
+        {views.length > 0 && (
+          <div style={{ borderTop: '1px solid #e2e8f0', marginTop: 20, paddingTop: 16 }}>
+            <p style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Saved Views</p>
+            {views.map(v => (
+              <div key={v.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: '#f8fafc', borderRadius: 6, marginBottom: 6 }}>
+                <span style={{ fontSize: 13, color: '#1e293b' }}>{v.name}</span>
+                <button onClick={() => onDelete(v.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 13, padding: '0 4px' }}>✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20 }}>
+          <button onClick={onClose} style={{ padding: '7px 16px', background: '#f1f5f9', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 600, color: '#475569', cursor: 'pointer' }}>Close</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const CONTACT_TYPE_OPTIONS = ['Owner', 'Property Manager', 'Attorney', 'Appraiser', 'Accountant', 'Advisor', 'Other']
 
 // ── Main Component ─────────────────────────────────────────────────────────
@@ -86,22 +174,48 @@ export default function ContactDetail() {
   const [saving, setSaving] = useState(false)
   const [deleteError, setDeleteError] = useState(null)
 
+  // ── Views / layout ───────────────────────────────────────────────────────
+  const { views, saveView, deleteView } = useViewPreferences('contact_detail')
+  const [tabConfig, setTabConfig]     = useState(DEFAULT_TAB_CONFIG)
+  const [activeViewId, setActiveViewId] = useState(null)
+  const [activeTab, setActiveTab]     = useState('Details')
+  const [showLayoutModal, setShowLayoutModal] = useState(false)
+
+  const handleLoadView = (viewId, config) => {
+    const merged = ALL_TABS.map(t => {
+      const saved = config?.tabs?.find(s => s.id === t.id)
+      return saved ? { ...t, visible: saved.visible } : { ...t, visible: true }
+    })
+    // Reorder by saved order
+    const orderedIds = config?.tabs?.map(s => s.id) || []
+    const ordered = [
+      ...orderedIds.map(sid => merged.find(t => t.id === sid)).filter(Boolean),
+      ...merged.filter(t => !orderedIds.includes(t.id))
+    ]
+    setTabConfig(ordered)
+    setActiveViewId(viewId)
+    // Switch to first visible tab
+    const firstVisible = ordered.find(t => t.visible)
+    if (firstVisible) setActiveTab(firstVisible.id)
+  }
+
+  const handleSaveView = async (name, config) => {
+    const saved = await saveView(name, config)
+    if (saved) {
+      setTabConfig(config.tabs)
+      setActiveViewId(saved.id)
+    }
+  }
+
+  const visibleTabs = tabConfig.filter(t => t.visible)
+
   useEffect(() => { fetchContact() }, [id])
 
   const fetchContact = async () => {
     setLoading(true)
     const { data: contactData, error } = await supabase
-      .from('contacts')
-      .select('*')
-      .eq('id', id)
-      .single()
-
-    if (error) {
-      console.error(error)
-      setLoading(false)
-      return
-    }
-
+      .from('contacts').select('*').eq('id', id).single()
+    if (error) { console.error(error); setLoading(false); return }
     setContact(contactData)
     setForm(contactData)
 
@@ -109,7 +223,6 @@ export default function ContactDetail() {
       .from('property_contacts')
       .select('*, property:properties(id, address, city, county, parcel_id, property_type, property_name, total_building_sqft, total_units)')
       .eq('contact_id', id)
-
     setLinkedProperties(propsData || [])
     setLoading(false)
   }
@@ -119,17 +232,11 @@ export default function ContactDetail() {
     const updateData = { ...form }
     delete updateData.full_name
     delete updateData.created_at
-    delete updateData.updated_at
+    updateData.updated_at = new Date().toISOString()
+    updateData.last_modified_by = user?.user_metadata?.full_name || user?.email || ''
 
     const { error } = await supabase.from('contacts').update(updateData).eq('id', id)
-
-    if (error) {
-      console.error(error)
-      alert('Failed to save contact')
-      setSaving(false)
-      return
-    }
-
+    if (error) { console.error(error); alert('Failed to save contact'); setSaving(false); return }
     setContact({ ...contact, ...updateData })
     setEditing(false)
     setSaving(false)
@@ -138,11 +245,18 @@ export default function ContactDetail() {
   const handleDelete = async () => {
     if (!window.confirm('Delete this contact? This cannot be undone.')) return
     const { error } = await supabase.from('contacts').delete().eq('id', id)
-    if (error) {
-      setDeleteError('Failed to delete: ' + error.message)
-      return
-    }
+    if (error) { setDeleteError('Failed to delete: ' + error.message); return }
     navigate('/contacts')
+  }
+
+  const handleToggleVerified = async () => {
+    const newVal = !contact.verified
+    const { error } = await supabase.from('contacts').update({
+      verified: newVal,
+      updated_at: new Date().toISOString(),
+      last_modified_by: user?.user_metadata?.full_name || user?.email || ''
+    }).eq('id', id)
+    if (!error) setContact(c => ({ ...c, verified: newVal }))
   }
 
   const f = (field, value) => setForm(prev => ({ ...prev, [field]: value }))
@@ -161,70 +275,68 @@ export default function ContactDetail() {
     <div style={{ padding: '24px', backgroundColor: '#f8fafc', minHeight: '100vh' }}>
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
 
-        {/* ── Back + Title Bar ────────────────────────────────────────────── */}
+        {/* ── Back ───────────────────────────────────────────────────────── */}
         <div style={{ marginBottom: 20 }}>
           <Link to="/contacts" style={{ color: '#1e40af', textDecoration: 'none', fontSize: 13, fontWeight: 600 }}>← Contacts</Link>
         </div>
 
-        {/* ── HERO CARD ───────────────────────────────────────────────────── */}
+        {/* ── HERO CARD ──────────────────────────────────────────────────── */}
         <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: '24px 28px', marginBottom: 20, boxShadow: '0 1px 8px rgba(0,0,0,0.06)' }}>
           <div style={{ display: 'flex', gap: 28 }}>
-
-            {/* LEFT: Photo Gallery (compact) */}
             <div style={{ flexShrink: 0 }}>
-              <PhotoGallery
-                recordType="contact"
-                recordId={id}
-                mode="compact"
-                initials={initials}
-                onMainPhotoChange={url => setContact(c => ({ ...c, photo_url: url }))}
-              />
+              <PhotoGallery recordType="contact" recordId={id} mode="compact" initials={initials}
+                onMainPhotoChange={url => setContact(c => ({ ...c, photo_url: url }))} />
             </div>
-
-            {/* RIGHT: Name, type badge, contact info, action buttons */}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
               <div>
-                {/* Name + type badge + action buttons */}
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
                   <div>
                     <h1 style={{ fontSize: 26, fontWeight: 800, color: '#1e293b', margin: '0 0 6px 0', lineHeight: 1.2 }}>
                       {contact.first_name} {contact.last_name}
                     </h1>
-                    {contact.contact_type && (
-                      <span style={{ background: '#dbeafe', color: '#1e40af', borderRadius: 20, padding: '3px 12px', fontSize: 12, fontWeight: 600, display: 'inline-block' }}>
-                        {contact.contact_type}
-                      </span>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      {contact.contact_type && (
+                        <span style={{ background: '#dbeafe', color: '#1e40af', borderRadius: 20, padding: '3px 12px', fontSize: 12, fontWeight: 600 }}>
+                          {contact.contact_type}
+                        </span>
+                      )}
+                      {/* Verified toggle */}
+                      <button onClick={handleToggleVerified}
+                        style={{ padding: '3px 12px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                          background: contact.verified ? '#dcfce7' : '#f1f5f9',
+                          color: contact.verified ? '#16a34a' : '#94a3b8',
+                          transition: 'all 0.15s' }}>
+                        {contact.verified ? '✓ Verified' : 'Unverified'}
+                      </button>
+                    </div>
+                    {/* Last modified */}
+                    {(contact.updated_at || contact.last_modified_by) && (
+                      <p style={{ margin: '6px 0 0', fontSize: 11, color: '#94a3b8' }}>
+                        Modified {contact.updated_at ? new Date(contact.updated_at).toLocaleDateString() : ''}
+                        {contact.last_modified_by ? ` by ${contact.last_modified_by}` : ''}
+                      </p>
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                     {editing ? (
                       <>
-                        <button
-                          onClick={handleSave}
-                          disabled={saving}
-                          style={{ padding: '7px 16px', background: '#1e40af', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.6 : 1 }}
-                        >
+                        <button onClick={handleSave} disabled={saving}
+                          style={{ padding: '7px 16px', background: '#1e40af', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.6 : 1 }}>
                           {saving ? 'Saving...' : 'Save'}
                         </button>
-                        <button
-                          onClick={() => { setForm(contact); setEditing(false) }}
-                          style={{ padding: '7px 16px', background: '#fff', color: '#1e293b', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
-                        >
+                        <button onClick={() => { setForm(contact); setEditing(false) }}
+                          style={{ padding: '7px 16px', background: '#fff', color: '#1e293b', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
                           Cancel
                         </button>
                       </>
                     ) : (
                       <>
-                        <button
-                          onClick={handleDelete}
-                          style={{ padding: '7px 14px', background: '#fff', color: '#ef4444', border: '1px solid #fecaca', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
-                        >
+                        <button onClick={handleDelete}
+                          style={{ padding: '7px 14px', background: '#fff', color: '#ef4444', border: '1px solid #fecaca', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
                           Delete
                         </button>
-                        <button
-                          onClick={() => setEditing(true)}
-                          style={{ padding: '7px 16px', background: '#1e40af', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
-                        >
+                        <button onClick={() => setEditing(true)}
+                          style={{ padding: '7px 16px', background: '#1e40af', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
                           ✏️ Edit Contact
                         </button>
                       </>
@@ -236,7 +348,6 @@ export default function ContactDetail() {
                   <div style={{ fontSize: 12, color: '#dc2626', padding: '6px 10px', background: '#fee2e2', borderRadius: 6, marginBottom: 8 }}>{deleteError}</div>
                 )}
 
-                {/* Quick contact info (view mode only) */}
                 {!editing && (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0 24px', marginTop: 12 }}>
                     <ReadField label="Email" value={contact.email_address} href={contact.email_address ? `mailto:${contact.email_address}` : null} />
@@ -250,115 +361,143 @@ export default function ContactDetail() {
           </div>
         </div>
 
-        {/* ── EDIT FORM (shown when editing) ─────────────────────────────── */}
+        {/* ── EDIT FORM ──────────────────────────────────────────────────── */}
         {editing && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
-            {/* Contact Info */}
-            <Section title="Contact Info">
-              <EditField label="First Name"    value={form.first_name}    onChange={v => f('first_name', v)} />
-              <EditField label="Last Name"     value={form.last_name}     onChange={v => f('last_name', v)} />
-              <EditField label="Contact Type"  value={form.contact_type}  type="select" options={CONTACT_TYPE_OPTIONS} onChange={v => f('contact_type', v)} />
-              <EditField label="Email"         value={form.email_address} type="email" onChange={v => f('email_address', v)} />
-              <EditField label="Main Phone"    value={form.main_phone}    onChange={v => f('main_phone', v)} />
-              <EditField label="Cell Phone"    value={form.cell_phone}    onChange={v => f('cell_phone', v)} />
-            </Section>
-
-            {/* Address & Notes */}
-            <Section title="Address &amp; Notes">
+            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 20px' }}>
+              <SH title="Contact Info" />
+              <EditField label="First Name"   value={form.first_name}    onChange={v => f('first_name', v)} />
+              <EditField label="Last Name"    value={form.last_name}     onChange={v => f('last_name', v)} />
+              <EditField label="Contact Type" value={form.contact_type}  type="select" options={CONTACT_TYPE_OPTIONS} onChange={v => f('contact_type', v)} />
+              <EditField label="Email"        value={form.email_address} type="email" onChange={v => f('email_address', v)} />
+              <EditField label="Main Phone"   value={form.main_phone}    onChange={v => f('main_phone', v)} />
+              <EditField label="Cell Phone"   value={form.cell_phone}    onChange={v => f('cell_phone', v)} />
+            </div>
+            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 20px' }}>
+              <SH title="Address &amp; Notes" />
               <EditField label="Street Address" value={form.address}    onChange={v => f('address', v)} />
               <EditField label="Unit / Suite"   value={form.unit_suite} onChange={v => f('unit_suite', v)} />
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <EditField label="City"  value={form.city}  onChange={v => f('city', v)} />
                 <EditField label="State" value={form.state} onChange={v => f('state', v)} />
               </div>
-              <EditField label="Zip" value={form.zipcode} onChange={v => f('zipcode', v)} />
-              <EditField label="Notes" value={form.notes} type="textarea" onChange={v => f('notes', v)} />
-            </Section>
-          </div>
-        )}
-
-        {/* ── DETAILS SECTIONS (view mode) ──────────────────────────────── */}
-        {!editing && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
-            <Section title="Contact Details">
-              <ReadField label="First Name"    value={contact.first_name} />
-              <ReadField label="Last Name"     value={contact.last_name} />
-              <ReadField label="Contact Type"  value={contact.contact_type} />
-              <ReadField label="Email"         value={contact.email_address} href={contact.email_address ? `mailto:${contact.email_address}` : null} />
-              <ReadField label="Main Phone"    value={contact.main_phone} href={contact.main_phone ? `tel:${contact.main_phone}` : null} />
-              <ReadField label="Cell Phone"    value={contact.cell_phone} href={contact.cell_phone ? `tel:${contact.cell_phone}` : null} />
-            </Section>
-
-            <Section title="Address &amp; Notes">
-              <ReadField label="Street Address" value={contact.address} />
-              <ReadField label="Unit / Suite"   value={contact.unit_suite} />
-              <ReadField label="City"           value={contact.city} />
-              <ReadField label="State"          value={contact.state} />
-              <ReadField label="Zip"            value={contact.zipcode} />
-              <ReadField label="Notes"          value={contact.notes} />
-            </Section>
-          </div>
-        )}
-
-        {/* ── LINKED PROPERTIES ──────────────────────────────────────────── */}
-        <Section title={`Linked Properties (${linkedProperties.length})`} defaultOpen={true}>
-          {linkedProperties.length === 0 ? (
-            <p style={{ margin: 0, fontSize: 13, color: '#94a3b8', fontStyle: 'italic' }}>No properties linked to this contact yet.</p>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                    {['Property', 'County', 'Parcel ID', 'Type', 'SF', 'Units', 'Role', ''].map(h => (
-                      <th key={h} style={{ padding: '10px 12px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: h === 'Property' ? 'left' : 'center', whiteSpace: 'nowrap' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {linkedProperties.map((pc, idx) => {
-                    const p = pc.property
-                    const propLabel = p?.property_name || p?.address || '—'
-                    const propSub = p?.property_name && p?.address ? p.address : null
-                    return (
-                      <tr key={pc.id} style={{ backgroundColor: idx % 2 === 0 ? '#fff' : '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                        <td style={{ padding: '10px 12px' }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>{propLabel}</div>
-                          {propSub && <div style={{ fontSize: 11, color: '#64748b' }}>{propSub}</div>}
-                        </td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center', fontSize: 13, color: '#475569' }}>{p?.county || '—'}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center', fontSize: 13, color: '#475569', fontFamily: 'monospace' }}>{p?.parcel_id || '—'}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                          {p?.property_type && (
-                            <span style={{ background: '#dbeafe', color: '#1e40af', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600 }}>{p.property_type}</span>
-                          )}
-                        </td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center', fontSize: 13, color: '#475569' }}>
-                          {p?.total_building_sqft ? p.total_building_sqft.toLocaleString() + ' SF' : '—'}
-                        </td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center', fontSize: 13, color: '#475569' }}>
-                          {p?.total_units || '—'}
-                        </td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                          <span style={{ background: '#f1f5f9', color: '#475569', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600 }}>{pc.role || '—'}</span>
-                        </td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                          <Link
-                            to={`/properties/${p?.id}`}
-                            style={{ color: '#1e40af', textDecoration: 'none', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}
-                          >
-                            View →
-                          </Link>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+              <EditField label="Zip"   value={form.zipcode} onChange={v => f('zipcode', v)} />
+              <EditField label="Notes" value={form.notes}   type="textarea" onChange={v => f('notes', v)} />
             </div>
-          )}
-        </Section>
+          </div>
+        )}
 
+        {/* ── TABBED CONTENT (view mode) ─────────────────────────────────── */}
+        {!editing && (
+          <div>
+            {/* Views bar */}
+            <ViewsBar views={views} activeViewId={activeViewId} onLoadView={handleLoadView} onEditLayout={() => setShowLayoutModal(true)} />
+
+            {/* Tab strip */}
+            <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '2px solid #e2e8f0', paddingBottom: 0 }}>
+              {visibleTabs.map(tab => (
+                <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                  style={{ padding: '8px 18px', background: 'none', border: 'none', borderBottom: activeTab === tab.id ? '2px solid #1e40af' : '2px solid transparent',
+                    marginBottom: -2, color: activeTab === tab.id ? '#1e40af' : '#64748b', fontWeight: activeTab === tab.id ? 700 : 500,
+                    fontSize: 13, cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap' }}>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Tab content */}
+            {activeTab === 'Details' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+                <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 20px' }}>
+                  <SH title="Contact Details" />
+                  <ReadField label="First Name"   value={contact.first_name} />
+                  <ReadField label="Last Name"    value={contact.last_name} />
+                  <ReadField label="Contact Type" value={contact.contact_type} />
+                  <ReadField label="Email"        value={contact.email_address} href={contact.email_address ? `mailto:${contact.email_address}` : null} />
+                  <ReadField label="Main Phone"   value={contact.main_phone} href={contact.main_phone ? `tel:${contact.main_phone}` : null} />
+                  <ReadField label="Cell Phone"   value={contact.cell_phone} href={contact.cell_phone ? `tel:${contact.cell_phone}` : null} />
+                </div>
+                <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 20px' }}>
+                  <SH title="Address &amp; Notes" />
+                  <ReadField label="Street Address" value={contact.address} />
+                  <ReadField label="Unit / Suite"   value={contact.unit_suite} />
+                  <ReadField label="City"           value={contact.city} />
+                  <ReadField label="State"          value={contact.state} />
+                  <ReadField label="Zip"            value={contact.zipcode} />
+                  <div style={{ padding: '8px 0' }}>
+                    <p style={{ margin: '0 0 4px', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Notes</p>
+                    <p style={{ margin: 0, fontSize: 13, color: contact.notes ? '#1e293b' : '#cbd5e1', whiteSpace: 'pre-wrap' }}>{contact.notes || '—'}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'LinkedProperties' && (
+              <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden', marginBottom: 20 }}>
+                <div style={{ padding: '14px 20px', borderBottom: '1px solid #e2e8f0' }}>
+                  <SH title={`Linked Properties (${linkedProperties.length})`} />
+                </div>
+                {linkedProperties.length === 0 ? (
+                  <p style={{ margin: 0, padding: '16px 20px', fontSize: 13, color: '#94a3b8', fontStyle: 'italic' }}>No properties linked to this contact yet.</p>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                          {['Property', 'County', 'Parcel ID', 'Type', 'SF', 'Units', 'Role', ''].map(h => (
+                            <th key={h} style={{ padding: '10px 12px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: h === 'Property' ? 'left' : 'center', whiteSpace: 'nowrap' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {linkedProperties.map((pc, idx) => {
+                          const p = pc.property
+                          const propLabel = p?.property_name || p?.address || '—'
+                          const propSub = p?.property_name && p?.address ? p.address : null
+                          return (
+                            <tr key={pc.id} style={{ backgroundColor: idx % 2 === 0 ? '#fff' : '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                              <td style={{ padding: '10px 12px' }}>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>{propLabel}</div>
+                                {propSub && <div style={{ fontSize: 11, color: '#64748b' }}>{propSub}</div>}
+                              </td>
+                              <td style={{ padding: '10px 12px', textAlign: 'center', fontSize: 13, color: '#475569' }}>{p?.county || '—'}</td>
+                              <td style={{ padding: '10px 12px', textAlign: 'center', fontSize: 13, color: '#475569', fontFamily: 'monospace' }}>{p?.parcel_id || '—'}</td>
+                              <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                                {p?.property_type && <span style={{ background: '#dbeafe', color: '#1e40af', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600 }}>{p.property_type}</span>}
+                              </td>
+                              <td style={{ padding: '10px 12px', textAlign: 'center', fontSize: 13, color: '#475569' }}>
+                                {p?.total_building_sqft ? p.total_building_sqft.toLocaleString() + ' SF' : '—'}
+                              </td>
+                              <td style={{ padding: '10px 12px', textAlign: 'center', fontSize: 13, color: '#475569' }}>{p?.total_units || '—'}</td>
+                              <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                                <span style={{ background: '#f1f5f9', color: '#475569', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600 }}>{pc.role || '—'}</span>
+                              </td>
+                              <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                                <Link to={`/properties/${p?.id}`} style={{ color: '#1e40af', textDecoration: 'none', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>View →</Link>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* ── Edit Layout Modal ───────────────────────────────────────────── */}
+      {showLayoutModal && (
+        <EditLayoutModal
+          tabConfig={tabConfig}
+          views={views}
+          onSave={handleSaveView}
+          onDelete={deleteView}
+          onClose={() => setShowLayoutModal(false)}
+        />
+      )}
     </div>
   )
 }

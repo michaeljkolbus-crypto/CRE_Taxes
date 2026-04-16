@@ -3,17 +3,20 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import { fmt, COUNTIES, PROPERTY_TYPES } from '../../lib/theme'
 import RecordToolbar from '../../components/shared/RecordToolbar'
+import { useViewPreferences } from '../../hooks/useViewPreferences'
 
 const COMPS_COLUMNS = [
-  { key: 'address',              label: 'Address',       visible: true },
-  { key: 'county',               label: 'County',        visible: true },
-  { key: 'sale_date',            label: 'Sale Date',     visible: true },
-  { key: 'sales_price',          label: 'Sale Price',    visible: true },
-  { key: 'total_building_sqft',  label: 'Bldg SF',       visible: true },
-  { key: 'sales_price_per_sqft', label: 'Sale$/SF',      visible: true },
-  { key: 'property_type',        label: 'Prop Type',     visible: true },
-  { key: 'data_source',          label: 'Data Source',   visible: true },
-  { key: 'verified',             label: 'Verified',      visible: true },
+  { key: 'address',              label: 'Address',       visible: true  },
+  { key: 'county',               label: 'County',        visible: true  },
+  { key: 'sale_date',            label: 'Sale Date',     visible: true  },
+  { key: 'sales_price',          label: 'Sale Price',    visible: true  },
+  { key: 'total_building_sqft',  label: 'Bldg SF',       visible: true  },
+  { key: 'sales_price_per_sqft', label: 'Sale$/SF',      visible: true  },
+  { key: 'property_type',        label: 'Prop Type',     visible: true  },
+  { key: 'data_source',          label: 'Data Source',   visible: true  },
+  { key: 'verified',             label: 'Verified',      visible: true  },
+  { key: 'last_modified_by',     label: 'Modified By',   visible: false },
+  { key: 'updated_at',           label: 'Last Modified', visible: false },
 ]
 
 const MASS_REPLACE_FIELDS = [
@@ -38,7 +41,37 @@ export default function CompsPage() {
   const [columns, setColumns] = useState(COMPS_COLUMNS)
   const [selectedIds, setSelectedIds] = useState([])
   const [importResult, setImportResult] = useState(null)
+  const [activeViewId, setActiveViewId] = useState(null)
   const pageSize = 50
+
+  const { views, saveView, deleteView } = useViewPreferences('comps_list')
+
+  const handleLoadView = (viewId, config) => {
+    const savedCols = config?.columns || []
+    const orderedKeys = savedCols.map(c => c.key)
+    const merged = [
+      ...orderedKeys.map(k => {
+        const base = COMPS_COLUMNS.find(c => c.key === k)
+        const saved = savedCols.find(c => c.key === k)
+        return base ? { ...base, visible: saved.visible } : null
+      }).filter(Boolean),
+      ...COMPS_COLUMNS.filter(c => !orderedKeys.includes(c.key)).map(c => ({ ...c, visible: false }))
+    ]
+    setColumns(merged); setActiveViewId(viewId)
+  }
+
+  const handleSaveView = async (name) => {
+    const config = { columns: columns.map(c => ({ key: c.key, visible: c.visible })) }
+    const saved = await saveView(name, config)
+    if (saved) setActiveViewId(saved.id)
+  }
+
+  const handleDeleteView = async (viewId) => {
+    await deleteView(viewId)
+    if (activeViewId === viewId) { setColumns(COMPS_COLUMNS); setActiveViewId(null) }
+  }
+
+  const handleColumnsChange = (newCols) => { setColumns(newCols); setActiveViewId(null) }
 
   useEffect(() => { fetchComps() }, [search, county, propType, page])
 
@@ -167,10 +200,15 @@ export default function CompsPage() {
         onImport={() => setShowImportModal(true)}
         onExport={handleExport}
         columns={columns}
-        onColumnsChange={setColumns}
+        onColumnsChange={handleColumnsChange}
         selectedIds={selectedIds}
         massReplaceFields={MASS_REPLACE_FIELDS}
         onMassReplace={handleMassReplace}
+        savedViews={views}
+        activeViewId={activeViewId}
+        onLoadView={handleLoadView}
+        onSaveView={handleSaveView}
+        onDeleteView={handleDeleteView}
       />
 
       {importResult && (
@@ -218,7 +256,9 @@ export default function CompsPage() {
                 {visCol('sales_price_per_sqft') && <th style={thStyle()}>Sale$/SF</th>}
                 {visCol('property_type') && <th style={thStyle()}>Prop Type</th>}
                 {visCol('data_source') && <th style={thStyle()}>Source</th>}
-                {visCol('verified') && <th style={thStyle()}>Verified</th>}
+                {visCol('verified')         && <th style={thStyle()}>Verified</th>}
+                {visCol('last_modified_by') && <th style={thStyle()}>Modified By</th>}
+                {visCol('updated_at')       && <th style={thStyle()}>Last Modified</th>}
                 <th style={thStyle()}>Actions</th>
               </tr>
             </thead>
@@ -260,6 +300,8 @@ export default function CompsPage() {
                         </button>
                       </td>
                     )}
+                    {visCol('last_modified_by') && <td style={tdStyle({ center: true })}>{comp.last_modified_by || '—'}</td>}
+                    {visCol('updated_at')       && <td style={tdStyle({ center: true })}>{comp.updated_at ? new Date(comp.updated_at).toLocaleDateString() : '—'}</td>}
                     <td style={tdStyle({ center: true })}>
                       <button
                         onClick={e => { e.stopPropagation(); setExpandedId(expandedId===comp.id ? null : comp.id) }}

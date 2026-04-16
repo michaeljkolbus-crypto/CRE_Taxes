@@ -674,7 +674,8 @@ export function PropertyDetail() {
       const updateData = { ...form }
       delete updateData.full_name
       delete updateData.created_at
-      delete updateData.updated_at
+      updateData.updated_at = new Date().toISOString()
+      updateData.last_modified_by = user?.user_metadata?.full_name || user?.email || ''
       updateData.total_units = calcTotalUnits || null
       updateData.sales_price_per_sqft = calcSalePricePerSqft
       updateData.bldg_assessment_per_sqft = calcBldgAssessmentPerSqft
@@ -702,6 +703,17 @@ export function PropertyDetail() {
       if (error) throw error
       navigate('/properties')
     } catch (err) { alert('Error deleting: ' + err.message) }
+  }
+
+  const handleToggleVerified = async () => {
+    const newVal = !form.verified
+    const now = new Date().toISOString()
+    const modifiedBy = user?.user_metadata?.full_name || user?.email || ''
+    const { error } = await supabase.from('properties').update({ verified: newVal, updated_at: now, last_modified_by: modifiedBy }).eq('id', id)
+    if (!error) {
+      setForm(prev => ({ ...prev, verified: newVal, updated_at: now, last_modified_by: modifiedBy }))
+      setProperty(prev => ({ ...prev, verified: newVal, updated_at: now, last_modified_by: modifiedBy }))
+    }
   }
 
   const f = (field, value) => setForm(prev => ({ ...prev, [field]: value }))
@@ -927,6 +939,12 @@ export function PropertyDetail() {
                     {form.property_subtype && (
                       <span style={{ background: '#f1f5f9', color: '#475569', borderRadius: 20, padding: '3px 12px', fontSize: 12, fontWeight: 600 }}>{form.property_subtype}</span>
                     )}
+                    <button onClick={handleToggleVerified}
+                      style={{ padding: '3px 12px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                        background: form.verified ? '#dcfce7' : '#f1f5f9',
+                        color: form.verified ? '#16a34a' : '#94a3b8' }}>
+                      {form.verified ? '✓ Verified' : 'Unverified'}
+                    </button>
                   </>
                 )}
               </div>
@@ -989,7 +1007,13 @@ export function PropertyDetail() {
                       </p>
                     )}
                     {form.address && (form.city || form.state) && (
-                      <p style={{ margin: '0 0 10px', fontSize: 12, color: '#94a3b8' }}>{form.address}</p>
+                      <p style={{ margin: '0 0 4px', fontSize: 12, color: '#94a3b8' }}>{form.address}</p>
+                    )}
+                    {(form.updated_at || form.last_modified_by) && (
+                      <p style={{ margin: '0 0 10px', fontSize: 11, color: '#94a3b8' }}>
+                        Modified {form.updated_at ? new Date(form.updated_at).toLocaleDateString() : ''}
+                        {form.last_modified_by ? ` by ${form.last_modified_by}` : ''}
+                      </p>
                     )}
                   </>
                 )}
