@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { fmt } from '../../lib/theme'
 import RecordToolbar from '../../components/shared/RecordToolbar'
 import { useViewPreferences } from '../../hooks/useViewPreferences'
+import { ExcelImporter } from '../../components/shared/ExcelImporter'
 
 const PAGE_SIZE = 50
 
@@ -29,6 +30,7 @@ export default function ContactsPage() {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(false)
   const [showModal, setShowModal] = useState(false)
+  const [showImport, setShowImport] = useState(false)
   const [selectedIds, setSelectedIds] = useState([])
   const [columns, setColumns] = useState(ALL_COLUMNS)
   const [activeViewId, setActiveViewId] = useState(null)
@@ -134,6 +136,7 @@ export default function ContactsPage() {
         count={total}
         onAdd={() => setShowModal(true)}
         addLabel="+ Add Contact"
+        onImport={() => setShowImport(true)}
         onExport={handleExport}
         selectedIds={selectedIds}
         columns={columns}
@@ -273,6 +276,14 @@ export default function ContactsPage() {
             </div>
           </div>
         </div>
+      )}
+      {showImport && (
+        <ExcelImporter
+          importType="contacts"
+          currentUserId={user?.id}
+          onClose={() => setShowImport(false)}
+          onDone={() => { setShowImport(false); fetchContacts() }}
+        />
       )}
     </div>
   )

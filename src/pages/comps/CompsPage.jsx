@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext'
 import { fmt, COUNTIES, PROPERTY_TYPES } from '../../lib/theme'
 import RecordToolbar from '../../components/shared/RecordToolbar'
 import { useViewPreferences } from '../../hooks/useViewPreferences'
+import { ExcelImporter } from '../../components/shared/ExcelImporter'
 
 const COMPS_COLUMNS = [
   { key: 'address',              label: 'Address',       visible: true  },
@@ -94,54 +95,6 @@ export default function CompsPage() {
     const newVal = !comp.verified
     const { error } = await supabase.from('comps').update({ verified: newVal }).eq('id', comp.id)
     if (!error) setComps(prev => prev.map(c => c.id === comp.id ? { ...c, verified: newVal } : c))
-  }
-
-  function parseCSV(text) {
-    const lines = text.trim().split('\n')
-    const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''))
-    return lines.slice(1).map(line => {
-      const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''))
-      const row = {}
-      headers.forEach((h, i) => { row[h] = values[i] || '' })
-      return row
-    })
-  }
-
-  async function handleImport(file, mappings) {
-    if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
-      const text = await file.text()
-      const rows = parseCSV(text)
-      const parcelIds = rows.filter(r => r.parcel_id).map(r => r.parcel_id)
-      const { data: existing } = await supabase.from('comps').select('id, parcel_id, sale_date').in('parcel_id', parcelIds)
-      const existingKeys = new Set(existing?.map(r => `${r.parcel_id}|${r.sale_date}`) || [])
-      let imported = 0, duplicates = 0, errors = 0
-      const toInsert = []
-      for (const row of rows) {
-        const key = `${row[mappings.parcel_id] || ''}|${row[mappings.sale_date] || ''}`
-        if (existingKeys.has(key)) { duplicates++; continue }
-        try {
-          const comp = {}
-          Object.entries(mappings).forEach(([field, col]) => {
-            const value = row[col]
-            if (field.includes('sqft') || field.includes('price') || field.includes('rate') || field.includes('income') || field.includes('tax') || field === 'year_built' || field === 'occupancy') {
-              comp[field] = value ? parseFloat(value) : null
-            } else { comp[field] = value || null }
-          })
-          toInsert.push(comp)
-        } catch (e) { errors++ }
-      }
-      if (toInsert.length > 0) {
-        const { error } = await supabase.from('comps').insert(toInsert)
-        if (!error) imported = toInsert.length
-        else errors += toInsert.length
-      }
-      setShowImportModal(false)
-      setImportResult(`✓ Import complete: ${imported} imported, ${duplicates} duplicates skipped, ${errors} errors`)
-      fetchComps()
-    } else {
-      setShowImportModal(false)
-      setImportResult('⚠ XLSX support coming soon. Please use CSV format.')
-    }
   }
 
   function handleExport() {
@@ -361,7 +314,14 @@ export default function CompsPage() {
       </div>
 
       {showAddModal && <AddCompModal onClose={() => setShowAddModal(false)} onAdd={addComp} />}
-      {showImportModal && <ImportModal onClose={() => setShowImportModal(false)} onImport={handleImport} />}
+      {showImportModal && (
+        <ExcelImporter
+          importType="comps"
+          currentUserId={user?.id}
+          onClose={() => setShowImportModal(false)}
+          onDone={() => { setShowImportModal(false); fetchComps() }}
+        />
+      )}
     </div>
   )
 }
@@ -432,83 +392,3 @@ function AddCompModal({ onClose, onAdd }) {
   )
 }
 
-function ImportModal({ onClose, onImport }) {
-  const [file, setFile] = useState(null)
-  const [preview, setPreview] = useState([])
-  const [mappings, setMappings] = useState({})
-  const [headers, setHeaders] = useState([])
-  const requiredFields = ['parcel_id','address','county','sale_date','sales_price','property_type']
-
-  const handleFileChange = async (e) => {
-    const f = e.target.files[0]
-    if (!f) return
-    setFile(f)
-    const text = await f.text()
-    const lines = text.trim().split('\n')
-    const fileHeaders = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g,''))
-    setHeaders(fileHeaders)
-    const rows = lines.slice(1,11).map(line => {
-      const values = line.split(',').map(v => v.trim().replace(/^"|"$/g,''))
-      const row = {}
-      fileHeaders.forEach((h,i) => { row[h] = values[i] || '' })
-      return row
-    })
-    setPreview(rows)
-  }
-
-  return (
-    <div style={{ position:'fixed', inset:0, backgroundColor:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }}>
-      <div style={{ backgroundColor:'#fff', borderRadius:12, padding:28, maxWidth:800, maxHeight:'90vh', overflowY:'auto', width:'90%' }}>
-        <h2 style={{ margin:'0 0 20px 0', color:'#1e293b', fontSize:18 }}>Import Comparable Sales</h2>
-        <div style={{ marginBottom:20 }}>
-          <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#64748b', marginBottom:8 }}>Select CSV file</label>
-          <input type="file" accept=".csv,.xlsx" onChange={handleFileChange} />
-          {file?.name && <p style={{ margin:'4px 0 0 0', fontSize:12, color:'#64748b' }}>Selected: {file.name}</p>}
-        </div>
-        {headers.length > 0 && (
-          <>
-            <h3 style={{ margin:'16px 0 10px 0', fontSize:15, color:'#1e293b' }}>Column Mapping</h3>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:20 }}>
-              {requiredFields.map(field => (
-                <div key={field}>
-                  <label style={{ display:'block', fontSize:11, fontWeight:600, color:'#64748b', marginBottom:4, textTransform:'uppercase' }}>{field} *</label>
-                  <select value={mappings[field]||''} onChange={e=>setMappings({...mappings,[field]:e.target.value})} style={{ width:'100%', padding:'7px 10px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:13, boxSizing:'border-box' }}>
-                    <option value="">Select column...</option>
-                    {headers.map(h=><option key={h}>{h}</option>)}
-                  </select>
-                </div>
-              ))}
-            </div>
-            <h3 style={{ margin:'16px 0 10px 0', fontSize:15, color:'#1e293b' }}>Preview (first 10 rows)</h3>
-            <div style={{ overflowX:'auto', marginBottom:20 }}>
-              <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
-                <thead>
-                  <tr style={{ borderBottom:'1px solid #e2e8f0', backgroundColor:'#f1f5f9' }}>
-                    {headers.map(h => <th key={h} style={{ padding:'6px 8px', textAlign:'left', fontWeight:600, color:'#1e293b' }}>{h}</th>)}
-                  </tr>
-                </thead>
-                <tbody>
-                  {preview.map((row,i) => (
-                    <tr key={i} style={{ borderBottom:'1px solid #e2e8f0' }}>
-                      {headers.map(h => <td key={h} style={{ padding:'6px 8px', color:'#1e293b' }}>{row[h]}</td>)}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-        <div style={{ display:'flex', gap:12, justifyContent:'flex-end' }}>
-          <button onClick={onClose} style={{ padding:'8px 16px', backgroundColor:'#e2e8f0', border:'1px solid #cbd5e1', borderRadius:8, cursor:'pointer', fontSize:13, fontWeight:600, color:'#1e293b' }}>Cancel</button>
-          <button
-            onClick={() => onImport(file, mappings)}
-            disabled={headers.length===0 || requiredFields.some(f=>!mappings[f])}
-            style={{ padding:'8px 16px', backgroundColor:'#1e40af', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontSize:13, fontWeight:600, opacity: headers.length===0||requiredFields.some(f=>!mappings[f]) ? 0.5 : 1 }}
-          >
-            Import
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}

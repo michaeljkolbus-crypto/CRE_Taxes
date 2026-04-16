@@ -5,6 +5,7 @@ import { fmt } from '../../lib/theme'
 import RecordToolbar from '../../components/shared/RecordToolbar'
 import { useViewPreferences } from '../../hooks/useViewPreferences'
 import { useAuth } from '../../context/AuthContext'
+import { ExcelImporter } from '../../components/shared/ExcelImporter'
 
 const APPEAL_PROP_TYPES = ['Commercial', 'Industrial', 'Duplex', 'Residential', 'Farmland']
 
@@ -304,6 +305,7 @@ export function PropertiesPage() {
   const [sortField, setSortField] = useState('created_at')
   const [sortAsc, setSortAsc] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showImport, setShowImport] = useState(false)
   const [viewMode, setViewMode] = useState('list')
   const [columns, setColumns] = useState(ALL_COLUMNS)
   const [selectedIds, setSelectedIds] = useState([])
@@ -441,6 +443,7 @@ export function PropertiesPage() {
         count={totalCount}
         onAdd={() => setShowAddModal(true)}
         addLabel="+ Add Property"
+        onImport={() => setShowImport(true)}
         onExport={handleExport}
         columns={columns}
         onColumnsChange={(updated) => { setColumns(updated); setActiveViewId(null) }}
@@ -546,6 +549,14 @@ export function PropertiesPage() {
       )}
 
       <AddPropertyModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} onSave={id => { setShowAddModal(false); navigate(`/properties/${id}`) }} />
+      {showImport && (
+        <ExcelImporter
+          importType="properties"
+          currentUserId={user?.id}
+          onClose={() => setShowImport(false)}
+          onDone={() => { setShowImport(false); fetchProperties() }}
+        />
+      )}
     </div>
   )
 }
