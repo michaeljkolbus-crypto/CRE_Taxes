@@ -435,6 +435,7 @@ function AppealsPanel({ propertyId }) {
   const navigate = useNavigate()
   const [appeals, setAppeals] = useState([])
   const [loading, setLoading] = useState(true)
+  const [appealError, setAppealError] = useState(null)
 
   useEffect(() => {
     fetchAppeals()
@@ -462,13 +463,14 @@ function AppealsPanel({ propertyId }) {
     try {
       const { data, error } = await supabase
         .from('appeals')
-        .insert([{ property_id: propertyId }])
+        .insert([{ property_id: propertyId, tax_year: new Date().getFullYear() }])
         .select()
 
       if (error) throw error
       navigate(`/appeals/${data[0].id}`)
     } catch (err) {
-      alert('Error creating appeal: ' + err.message)
+      console.error('Error creating appeal:', err.message)
+      setAppealError('Error creating appeal: ' + err.message)
     }
   }
 
@@ -534,6 +536,12 @@ function AppealsPanel({ propertyId }) {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {appealError && (
+        <div style={{ fontSize: 12, color: '#dc2626', marginBottom: '8px', padding: '6px 8px', background: '#fee2e2', borderRadius: 4 }}>
+          {appealError}
         </div>
       )}
 
