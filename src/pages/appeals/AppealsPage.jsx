@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { fmt } from '../../lib/theme'
+import RecordToolbar from '../../components/shared/RecordToolbar'
 
 function calcFinancials(appeal) {
   const eavPre = parseFloat(appeal?.eav_pre) || 0
