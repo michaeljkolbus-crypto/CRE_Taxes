@@ -319,13 +319,14 @@ export function PropertyDetail() {
       if (error) throw error
       setProperty(data)
       setForm(data)
-      const { data: pcData } = await supabase
+      // Prefer the primary contact; fall back to the first linked contact
+      const { data: allPc } = await supabase
         .from('property_contacts')
         .select('*, contact:contacts(id, first_name, last_name, email_address, main_phone, company_id, company:companies(id, company_name))')
         .eq('property_id', id)
-        .eq('is_primary', true)
-        .maybeSingle()
-      setPrimaryContact(pcData?.contact || null)
+        .order('is_primary', { ascending: false })
+      const best = allPc?.[0]
+      setPrimaryContact(best?.contact || null)
     } catch (err) {
       console.error('Error fetching property:', err)
       navigate('/properties')
@@ -405,7 +406,7 @@ export function PropertyDetail() {
   const fullAddress = addressParts.join(', ')
   const mapsAddress = encodeURIComponent(fullAddress || form.property_name || '')
 
-  const tabs = ['Overview', 'Tax & Assessment', 'Residential', 'Notes']
+  const tabs = ['Overview', 'Tax & Assessment', 'Residential']
   const grid2col = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px 32px', marginBottom: '24px' }
 
   // ── Section header rendered inside the 2-col grid (spans full width) ──────
