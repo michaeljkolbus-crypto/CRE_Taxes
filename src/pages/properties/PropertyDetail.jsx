@@ -305,7 +305,7 @@ export function PropertyDetail() {
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({})
   const [saving, setSaving] = useState(false)
-  const [activeTab, setActiveTab] = useState('Property Details')
+  const [activeTab, setActiveTab] = useState('Overview')
   const [primaryContact, setPrimaryContact] = useState(null)
 
   const isAdmin = user?.role === 'admin'
@@ -321,7 +321,7 @@ export function PropertyDetail() {
       setForm(data)
       const { data: pcData } = await supabase
         .from('property_contacts')
-        .select('*, contact:contacts(id, first_name, last_name, email_address, main_phone)')
+        .select('*, contact:contacts(id, first_name, last_name, email_address, main_phone, company_id, company:companies(id, company_name))')
         .eq('property_id', id)
         .eq('is_primary', true)
         .maybeSingle()
@@ -405,15 +405,25 @@ export function PropertyDetail() {
   const fullAddress = addressParts.join(', ')
   const mapsAddress = encodeURIComponent(fullAddress || form.property_name || '')
 
-  const tabs = ['Property Details', 'Sale History', 'Building Breakdown', 'Location', 'Tax & Assessment', 'Additional Details', 'Multifamily', 'Industrial', 'Residential', 'Duplex', 'Notes']
+  const tabs = ['Overview', 'Tax & Assessment', 'Residential', 'Notes']
   const grid2col = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px 32px', marginBottom: '24px' }
+
+  // ── Section header rendered inside the 2-col grid (spans full width) ──────
+  const SH = ({ title }) => (
+    <div style={{ gridColumn: '1 / -1', borderBottom: '2px solid #e2e8f0', paddingBottom: 5, marginTop: 8 }}>
+      <span style={{ fontSize: 11, fontWeight: 700, color: '#1e40af', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{title}</span>
+    </div>
+  )
 
   const TabContent = () => {
     switch (activeTab) {
 
-      case 'Property Details':
+      // ── OVERVIEW: Property Details + Building Breakdown + Sale History + Location ──
+      case 'Overview':
         return (
           <div style={grid2col}>
+
+            <SH title="Property Details" />
             <FieldRow label="Current Use" value={form.current_use} editing={editing} onChange={v => f('current_use', v)} />
             <FieldRow label="# of Buildings" value={form.num_buildings} editing={editing} type="number" onChange={v => f('num_buildings', v)} />
             <FieldRow label="# of Stories" value={form.num_stories} editing={editing} type="number" onChange={v => f('num_stories', v)} />
@@ -427,32 +437,14 @@ export function PropertyDetail() {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <span style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Year Built / Year Renovated</span>
-                <span style={{ fontSize: 14, color: '#1e293b' }}>
-                  {[form.year_built, form.year_renovated].filter(Boolean).join(' / ') || '—'}
-                </span>
+                <span style={{ fontSize: 14, color: '#1e293b' }}>{[form.year_built, form.year_renovated].filter(Boolean).join(' / ') || '—'}</span>
               </div>
             )}
             <FieldRow label="Exterior Construction" value={form.exterior_construction} editing={editing} onChange={v => f('exterior_construction', v)} />
             <FieldRow label="Total Land Acres" value={form.total_land_acres} editing={editing} type="number" onChange={v => f('total_land_acres', v)} />
             <FieldRow label="Zoning" value={form.zoning} editing={editing} onChange={v => f('zoning', v)} />
-          </div>
-        )
 
-      case 'Sale History':
-        return (
-          <div style={grid2col}>
-            <FieldRow label="Last Sale Price" value={form.sales_price} editing={editing} type="number" onChange={v => f('sales_price', v)} />
-            <FieldRow label="Last Sale Date" value={form.sale_date} editing={editing} type="date" onChange={v => f('sale_date', v)} />
-            <CalcRow label="Sale Price per SQ FT" value={calcSalePricePerSqft} format={v => '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} />
-            <CalcRow label="Sale Price per Unit" value={calcSalePricePerUnit} format={fmt.currency} />
-            <FieldRow label="Sale Cap Rate" value={form.sale_cap_rate} editing={editing} type="number" onChange={v => f('sale_cap_rate', v)} />
-            <FieldRow label="Sale GRM" value={form.sale_grm} editing={editing} type="number" onChange={v => f('sale_grm', v)} />
-          </div>
-        )
-
-      case 'Building Breakdown':
-        return (
-          <div style={grid2col}>
+            <SH title="Building Breakdown" />
             <FieldRow label="Residential SQ FT" value={form.residential_sqft} editing={editing} type="number" onChange={v => f('residential_sqft', v)} />
             <FieldRow label="Retail Space SQ FT" value={form.retail_space_sqft} editing={editing} type="number" onChange={v => f('retail_space_sqft', v)} />
             <FieldRow label="Office Space SQ FT" value={form.office_space_sqft} editing={editing} type="number" onChange={v => f('office_space_sqft', v)} />
@@ -462,12 +454,27 @@ export function PropertyDetail() {
             <CalcRow label="Vacancy %" value={calcVacancyPct} format={v => v.toFixed(1) + '%'} />
             <FieldRow label="# of Parking Spaces" value={form.num_parking_spaces} editing={editing} type="number" onChange={v => f('num_parking_spaces', v)} />
             <FieldRow label="Sprinkler System" value={form.sprinkler_system} editing={editing} onChange={v => f('sprinkler_system', v)} />
-          </div>
-        )
+            <FieldRow label="Apartment Mix" value={form.apartment_mix} editing={editing} onChange={v => f('apartment_mix', v)} />
+            <FieldRow label="# 0-Bed Apts" value={form.num_0bed_apts} editing={editing} type="number" onChange={v => f('num_0bed_apts', v)} />
+            <FieldRow label="# 1-Bed Apts" value={form.num_1bed_apts} editing={editing} type="number" onChange={v => f('num_1bed_apts', v)} />
+            <FieldRow label="# 2-Bed Apts" value={form.num_2bed_apts} editing={editing} type="number" onChange={v => f('num_2bed_apts', v)} />
+            <FieldRow label="# 3-Bed Apts" value={form.num_3bed_apts} editing={editing} type="number" onChange={v => f('num_3bed_apts', v)} />
+            <FieldRow label="# 4-Bed Apts" value={form.num_4bed_apts} editing={editing} type="number" onChange={v => f('num_4bed_apts', v)} />
+            <FieldRow label="Individual Laundry" value={form.individual_laundry} editing={editing} type="boolean" onChange={v => f('individual_laundry', v)} />
+            <FieldRow label="Manufacturing SQ FT" value={form.manufacturing_sqft} editing={editing} type="number" onChange={v => f('manufacturing_sqft', v)} />
+            <FieldRow label="Ceiling Height" value={form.ceiling_height} editing={editing} type="number" onChange={v => f('ceiling_height', v)} />
+            <FieldRow label="# Loading Docks" value={form.num_loading_docks} editing={editing} type="number" onChange={v => f('num_loading_docks', v)} />
+            <FieldRow label="Other Improvements" value={form.other_improvements} editing={editing} onChange={v => f('other_improvements', v)} />
 
-      case 'Location':
-        return (
-          <div style={grid2col}>
+            <SH title="Sale History" />
+            <FieldRow label="Last Sale Price" value={form.sales_price} editing={editing} type="number" onChange={v => f('sales_price', v)} />
+            <FieldRow label="Last Sale Date" value={form.sale_date} editing={editing} type="date" onChange={v => f('sale_date', v)} />
+            <CalcRow label="Sale Price per SQ FT" value={calcSalePricePerSqft} format={v => '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} />
+            <CalcRow label="Sale Price per Unit" value={calcSalePricePerUnit} format={fmt.currency} />
+            <FieldRow label="Sale Cap Rate" value={form.sale_cap_rate} editing={editing} type="number" onChange={v => f('sale_cap_rate', v)} />
+            <FieldRow label="Sale GRM" value={form.sale_grm} editing={editing} type="number" onChange={v => f('sale_grm', v)} />
+
+            <SH title="Location" />
             <FieldRow label="Address" value={form.address} editing={editing} onChange={v => f('address', v)} />
             <FieldRow label="City" value={form.city} editing={editing} onChange={v => f('city', v)} />
             <FieldRow label="State" value={form.state} editing={editing} onChange={v => f('state', v)} />
@@ -477,9 +484,25 @@ export function PropertyDetail() {
             <FieldRow label="Neighborhood #" value={form.neighborhood_num} editing={editing} onChange={v => f('neighborhood_num', v)} />
             <FieldRow label="Market" value={form.market} editing={editing} onChange={v => f('market', v)} />
             <FieldRow label="Submarket" value={form.submarket} editing={editing} onChange={v => f('submarket', v)} />
+            <FieldRow label="Latitude" value={form.latitude} editing={editing} type="number" onChange={v => f('latitude', v)} />
+            <FieldRow label="Longitude" value={form.longitude} editing={editing} type="number" onChange={v => f('longitude', v)} />
+            <CalcRow label="Total Land SQ FT" value={calcTotalLandSqft} format={v => Math.round(v).toLocaleString()} />
+            <CalcRow label="Land to Bldg Ratio" value={calcLandToBldgRatio} format={v => (Math.round(v * 100) / 100).toFixed(2)} />
+            <FieldRow label="Parcel ID 2" value={form.parcel_id2} editing={editing} onChange={v => f('parcel_id2', v)} />
+            <FieldRow label="Parcel ID 3" value={form.parcel_id3} editing={editing} onChange={v => f('parcel_id3', v)} />
+            <FieldRow label="Parcel ID 4" value={form.parcel_id4} editing={editing} onChange={v => f('parcel_id4', v)} />
+            <FieldRow label="Parcel ID 5" value={form.parcel_id5} editing={editing} onChange={v => f('parcel_id5', v)} />
+            <FieldRow label="Misc Parcels" value={form.misc_parcels} editing={editing} onChange={v => f('misc_parcels', v)} />
+
+            <SH title="Notes" />
+            <div style={{ gridColumn: '1 / -1' }}>
+              <FieldRow label="Notes" value={form.notes} editing={editing} type="textarea" onChange={v => f('notes', v)} />
+            </div>
+
           </div>
         )
 
+      // ── TAX & ASSESSMENT ──────────────────────────────────────────────────
       case 'Tax & Assessment':
         return (
           <div style={grid2col}>
@@ -497,47 +520,11 @@ export function PropertyDetail() {
           </div>
         )
 
-      case 'Additional Details':
-        return (
-          <div style={grid2col}>
-            <FieldRow label="Latitude" value={form.latitude} editing={editing} type="number" onChange={v => f('latitude', v)} />
-            <FieldRow label="Longitude" value={form.longitude} editing={editing} type="number" onChange={v => f('longitude', v)} />
-            <CalcRow label="Total Land SQ FT" value={calcTotalLandSqft} format={v => Math.round(v).toLocaleString()} />
-            <CalcRow label="Land to Bldg Ratio" value={calcLandToBldgRatio} format={v => (Math.round(v * 100) / 100).toFixed(2)} />
-            <FieldRow label="Parcel ID 2" value={form.parcel_id2} editing={editing} onChange={v => f('parcel_id2', v)} />
-            <FieldRow label="Parcel ID 3" value={form.parcel_id3} editing={editing} onChange={v => f('parcel_id3', v)} />
-            <FieldRow label="Parcel ID 4" value={form.parcel_id4} editing={editing} onChange={v => f('parcel_id4', v)} />
-            <FieldRow label="Parcel ID 5" value={form.parcel_id5} editing={editing} onChange={v => f('parcel_id5', v)} />
-            <FieldRow label="Misc Parcels" value={form.misc_parcels} editing={editing} onChange={v => f('misc_parcels', v)} />
-          </div>
-        )
-
-      case 'Multifamily':
-        return (
-          <div style={grid2col}>
-            <FieldRow label="Apartment Mix" value={form.apartment_mix} editing={editing} onChange={v => f('apartment_mix', v)} />
-            <FieldRow label="# 0-Bed Apts" value={form.num_0bed_apts} editing={editing} type="number" onChange={v => f('num_0bed_apts', v)} />
-            <FieldRow label="# 1-Bed Apts" value={form.num_1bed_apts} editing={editing} type="number" onChange={v => f('num_1bed_apts', v)} />
-            <FieldRow label="# 2-Bed Apts" value={form.num_2bed_apts} editing={editing} type="number" onChange={v => f('num_2bed_apts', v)} />
-            <FieldRow label="# 3-Bed Apts" value={form.num_3bed_apts} editing={editing} type="number" onChange={v => f('num_3bed_apts', v)} />
-            <FieldRow label="# 4-Bed Apts" value={form.num_4bed_apts} editing={editing} type="number" onChange={v => f('num_4bed_apts', v)} />
-            <FieldRow label="Individual Laundry" value={form.individual_laundry} editing={editing} type="boolean" onChange={v => f('individual_laundry', v)} />
-          </div>
-        )
-
-      case 'Industrial':
-        return (
-          <div style={grid2col}>
-            <FieldRow label="Manufacturing SQ FT" value={form.manufacturing_sqft} editing={editing} type="number" onChange={v => f('manufacturing_sqft', v)} />
-            <FieldRow label="Ceiling Height" value={form.ceiling_height} editing={editing} type="number" onChange={v => f('ceiling_height', v)} />
-            <FieldRow label="# Loading Docks" value={form.num_loading_docks} editing={editing} type="number" onChange={v => f('num_loading_docks', v)} />
-            <FieldRow label="Other Improvements" value={form.other_improvements} editing={editing} onChange={v => f('other_improvements', v)} />
-          </div>
-        )
-
+      // ── RESIDENTIAL + DUPLEX ──────────────────────────────────────────────
       case 'Residential':
         return (
           <div style={grid2col}>
+            <SH title="Residential Details" />
             <FieldRow label="Total Living Area SQ FT" value={form.total_living_area_sqft} editing={editing} type="number" onChange={v => f('total_living_area_sqft', v)} />
             <FieldRow label="Main Living Area SQ FT" value={form.main_living_area_sqft} editing={editing} type="number" onChange={v => f('main_living_area_sqft', v)} />
             <FieldRow label="Recreation Area SQ FT" value={form.recreation_area_sqft} editing={editing} type="number" onChange={v => f('recreation_area_sqft', v)} />
@@ -554,12 +541,8 @@ export function PropertyDetail() {
             <FieldRow label="Grade" value={form.grade} editing={editing} onChange={v => f('grade', v)} />
             <FieldRow label="Condition" value={form.condition} editing={editing} onChange={v => f('condition', v)} />
             <FieldRow label="Air Conditioning" value={form.air_conditioning} editing={editing} type="boolean" onChange={v => f('air_conditioning', v)} />
-          </div>
-        )
 
-      case 'Duplex':
-        return (
-          <div style={grid2col}>
+            <SH title="Duplex / Per-Unit Calculations" />
             <CalcRow label="# of Bathrooms per Unit" value={calcBathsPerUnit} format={v => (Math.round(v * 10) / 10).toFixed(1)} />
             <CalcRow label="Total Living Area SQ FT per Unit" value={calcLivingAreaPerUnit} format={v => Math.round(v).toLocaleString()} />
             <CalcRow label="Basement Area SQ FT per Unit" value={calcBasementPerUnit} format={v => Math.round(v).toLocaleString()} />
@@ -568,6 +551,7 @@ export function PropertyDetail() {
           </div>
         )
 
+      // ── NOTES ─────────────────────────────────────────────────────────────
       case 'Notes':
         return (
           <div>
@@ -633,43 +617,54 @@ export function PropertyDetail() {
 
             {/* Row 2: Name + Address + Owner | Photo + Map */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                <div>
-                  <h1 style={{ fontSize: 28, fontWeight: 800, color: '#1e293b', margin: '0 0 4px 0', lineHeight: 1.2 }}>
-                    {form.property_name || form.address || 'Unnamed Property'}
-                  </h1>
-                  {/* Address line: city, state zip */}
-                  {(form.city || form.state || form.zipcode) && (
-                    <p style={{ margin: '0 0 4px', fontSize: 13, color: '#64748b' }}>
-                      📍 {[form.city, form.state, form.zipcode].filter(Boolean).join(', ')}
-                    </p>
-                  )}
-                  {form.address && (form.city || form.state) && (
-                    <p style={{ margin: '0 0 16px', fontSize: 12, color: '#94a3b8' }}>{form.address}</p>
-                  )}
-                </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                <h1 style={{ fontSize: 28, fontWeight: 800, color: '#1e293b', margin: '0 0 4px 0', lineHeight: 1.2 }}>
+                  {form.property_name || form.address || 'Unnamed Property'}
+                </h1>
+                {/* Address line */}
+                {(form.city || form.state || form.zipcode) && (
+                  <p style={{ margin: '0 0 2px', fontSize: 13, color: '#64748b' }}>
+                    📍 {[form.city, form.state, form.zipcode].filter(Boolean).join(', ')}
+                  </p>
+                )}
+                {form.address && (form.city || form.state) && (
+                  <p style={{ margin: '0 0 10px', fontSize: 12, color: '#94a3b8' }}>{form.address}</p>
+                )}
+                {/* Owner Contact + Company — directly under address */}
                 {primaryContact && (
-                  <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 14, marginTop: 'auto' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 10, marginTop: 4, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', minWidth: 120 }}>Owner Name</span>
+                      <button
+                        onClick={() => navigate(`/contacts/${primaryContact.id}`)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#1e40af', fontSize: 13, fontWeight: 700, textDecoration: 'underline' }}
+                      >
+                        {primaryContact.first_name} {primaryContact.last_name}
+                      </button>
+                    </div>
+                    {primaryContact.company && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', minWidth: 110 }}>Owner Name</span>
-                        <button onClick={() => navigate(`/contacts/${primaryContact.id}`)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#1e40af', fontSize: 14, fontWeight: 700, textDecoration: 'underline' }}>
-                          {primaryContact.first_name} {primaryContact.last_name}
+                        <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', minWidth: 120 }}>Owner Company</span>
+                        <button
+                          onClick={() => navigate(`/companies/${primaryContact.company.id}`)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#1e40af', fontSize: 13, fontWeight: 700, textDecoration: 'underline' }}
+                        >
+                          {primaryContact.company.company_name}
                         </button>
                       </div>
-                      {primaryContact.main_phone && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', minWidth: 110 }}>Phone</span>
-                          <span style={{ fontSize: 13, color: '#475569' }}>{primaryContact.main_phone}</span>
-                        </div>
-                      )}
-                      {primaryContact.email_address && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', minWidth: 110 }}>Email</span>
-                          <a href={`mailto:${primaryContact.email_address}`} style={{ fontSize: 13, color: '#1e40af', textDecoration: 'none' }}>{primaryContact.email_address}</a>
-                        </div>
-                      )}
-                    </div>
+                    )}
+                    {primaryContact.main_phone && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', minWidth: 120 }}>Phone</span>
+                        <span style={{ fontSize: 13, color: '#475569' }}>{primaryContact.main_phone}</span>
+                      </div>
+                    )}
+                    {primaryContact.email_address && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', minWidth: 120 }}>Email</span>
+                        <a href={`mailto:${primaryContact.email_address}`} style={{ fontSize: 13, color: '#1e40af', textDecoration: 'none' }}>{primaryContact.email_address}</a>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
