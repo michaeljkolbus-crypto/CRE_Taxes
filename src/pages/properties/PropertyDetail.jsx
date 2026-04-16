@@ -1001,59 +1001,53 @@ export function PropertyDetail() {
                   </div>
                 ) : (
                   <>
-                    {(form.city || form.state || form.zipcode) && (
-                      <p style={{ margin: '0 0 2px', fontSize: 13, color: '#64748b' }}>
-                        📍 {[form.city, form.state, form.zipcode].filter(Boolean).join(', ')}
-                      </p>
-                    )}
-                    {form.address && (form.city || form.state) && (
-                      <p style={{ margin: '0 0 4px', fontSize: 12, color: '#94a3b8' }}>{form.address}</p>
-                    )}
-                    {(form.updated_at || form.last_modified_by) && (
-                      <p style={{ margin: '0 0 10px', fontSize: 11, color: '#94a3b8' }}>
-                        Modified {form.updated_at ? new Date(form.updated_at).toLocaleDateString() : ''}
-                        {form.last_modified_by ? ` by ${form.last_modified_by}` : ''}
-                      </p>
-                    )}
+                    <p style={{ margin: '0 0 2px', fontSize: 13, color: '#64748b' }}>
+                      {form.address || '—'}
+                    </p>
+                    <p style={{ margin: '0 0 10px', fontSize: 12, color: '#94a3b8' }}>
+                      {[form.city, form.state, form.zipcode].filter(Boolean).join(', ') || '—'}
+                    </p>
                   </>
                 )}
 
-                {primaryContact && (
-                  <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 10, marginTop: 4, display: 'flex', flexDirection: 'column', gap: 5 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', minWidth: 120 }}>Owner Name</span>
+                <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 10, marginTop: 4, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', minWidth: 120 }}>Owner Name</span>
+                    {primaryContact ? (
                       <button
                         onClick={() => navigate(`/contacts/${primaryContact.id}`)}
                         style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#1e40af', fontSize: 13, fontWeight: 700, textDecoration: 'underline' }}
                       >
                         {primaryContact.first_name} {primaryContact.last_name}
                       </button>
-                    </div>
-                    {primaryContact.company && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', minWidth: 120 }}>Owner Company</span>
-                        <button
-                          onClick={() => navigate(`/companies/${primaryContact.company.id}`)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#1e40af', fontSize: 13, fontWeight: 700, textDecoration: 'underline' }}
-                        >
-                          {primaryContact.company.company_name}
-                        </button>
-                      </div>
-                    )}
-                    {primaryContact.main_phone && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', minWidth: 120 }}>Phone</span>
-                        <span style={{ fontSize: 13, color: '#475569' }}>{primaryContact.main_phone}</span>
-                      </div>
-                    )}
-                    {primaryContact.email_address && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', minWidth: 120 }}>Email</span>
-                        <a href={`mailto:${primaryContact.email_address}`} style={{ fontSize: 13, color: '#1e40af', textDecoration: 'none' }}>{primaryContact.email_address}</a>
-                      </div>
+                    ) : (
+                      <span style={{ fontSize: 13, color: '#94a3b8' }}>—</span>
                     )}
                   </div>
-                )}
+                  {primaryContact?.company && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', minWidth: 120 }}>Owner Company</span>
+                      <button
+                        onClick={() => navigate(`/companies/${primaryContact.company.id}`)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#1e40af', fontSize: 13, fontWeight: 700, textDecoration: 'underline' }}
+                      >
+                        {primaryContact.company.company_name}
+                      </button>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', minWidth: 120 }}>Phone</span>
+                    <span style={{ fontSize: 13, color: '#475569' }}>{primaryContact?.main_phone || '—'}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', minWidth: 120 }}>Email</span>
+                    {primaryContact?.email_address ? (
+                      <a href={`mailto:${primaryContact.email_address}`} style={{ fontSize: 13, color: '#1e40af', textDecoration: 'none' }}>{primaryContact.email_address}</a>
+                    ) : (
+                      <span style={{ fontSize: 13, color: '#94a3b8' }}>—</span>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* Photo + Map */}
@@ -1130,6 +1124,14 @@ export function PropertyDetail() {
 
           <TabContent />
         </div>
+
+        {/* ── Modified Footer ───────────────────────────────────────────────── */}
+        {(form.updated_at || form.last_modified_by) && (
+          <div style={{ textAlign: 'right', padding: '8px 4px 0', fontSize: 11, color: '#94a3b8' }}>
+            Modified {form.updated_at ? new Date(form.updated_at).toLocaleDateString() : ''}
+            {form.last_modified_by ? ` by ${form.last_modified_by}` : ''}
+          </div>
+        )}
 
       </div>
 
