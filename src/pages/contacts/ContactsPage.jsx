@@ -10,12 +10,17 @@ import { ExcelImporter } from '../../components/shared/ExcelImporter'
 const PAGE_SIZE = 50
 
 const ALL_COLUMNS = [
-  { key: 'full_name',        label: 'Name',          visible: true  },
+  { key: 'full_name',        label: 'Name',           visible: true  },
   { key: 'company_name',     label: 'Company',        visible: true  },
   { key: 'main_phone',       label: 'Phone',          visible: true  },
   { key: 'email_address',    label: 'Email',          visible: true  },
   { key: 'contact_type',     label: 'Contact Type',   visible: true  },
   { key: 'city',             label: 'City',           visible: true  },
+  { key: 'title',            label: 'Title',          visible: false },
+  { key: 'source',           label: 'Source',         visible: false },
+  { key: 'contact_groups',   label: 'Groups',         visible: false },
+  { key: 'segments',         label: 'Segments',       visible: false },
+  { key: 'linkedin_url',     label: 'LinkedIn',       visible: false },
   { key: 'verified',         label: 'Verified',       visible: false },
   { key: 'last_modified_by', label: 'Modified By',    visible: false },
   { key: 'updated_at',       label: 'Last Modified',  visible: false },
@@ -163,6 +168,11 @@ export default function ContactsPage() {
                 {visCol('email_address')    && <th style={{ ...fmt.th, padding: '12px 16px' }}>Email</th>}
                 {visCol('contact_type')     && <th style={{ ...fmt.th, padding: '12px 16px' }}>Contact Type</th>}
                 {visCol('city')             && <th style={{ ...fmt.th, padding: '12px 16px' }}>City</th>}
+                {visCol('title')            && <th style={{ ...fmt.th, padding: '12px 16px' }}>Title</th>}
+                {visCol('source')           && <th style={{ ...fmt.th, padding: '12px 16px' }}>Source</th>}
+                {visCol('contact_groups')   && <th style={{ ...fmt.th, padding: '12px 16px' }}>Groups</th>}
+                {visCol('segments')         && <th style={{ ...fmt.th, padding: '12px 16px' }}>Segments</th>}
+                {visCol('linkedin_url')     && <th style={{ ...fmt.th, padding: '12px 16px' }}>LinkedIn</th>}
                 {visCol('verified')         && <th style={{ ...fmt.th, padding: '12px 16px' }}>Verified</th>}
                 {visCol('last_modified_by') && <th style={{ ...fmt.th, padding: '12px 16px' }}>Modified By</th>}
                 {visCol('updated_at')       && <th style={{ ...fmt.th, padding: '12px 16px' }}>Last Modified</th>}
@@ -180,6 +190,15 @@ export default function ContactsPage() {
                   {visCol('email_address') && <td style={{ ...fmt.td, padding: '12px 16px' }}>{contact.email_address || '—'}</td>}
                   {visCol('contact_type')  && <td style={{ ...fmt.td, padding: '12px 16px' }}>{contact.contact_type || '—'}</td>}
                   {visCol('city')          && <td style={{ ...fmt.td, padding: '12px 16px' }}>{contact.city || '—'}</td>}
+                  {visCol('title')         && <td style={{ ...fmt.td, padding: '12px 16px' }}>{contact.title || '—'}</td>}
+                  {visCol('source')        && <td style={{ ...fmt.td, padding: '12px 16px' }}>{contact.source || '—'}</td>}
+                  {visCol('contact_groups') && <td style={{ ...fmt.td, padding: '12px 16px' }}>{(contact.contact_groups || []).join(', ') || '—'}</td>}
+                  {visCol('segments')      && <td style={{ ...fmt.td, padding: '12px 16px' }}>{(contact.segments || []).join(', ') || '—'}</td>}
+                  {visCol('linkedin_url')  && <td style={{ ...fmt.td, padding: '12px 16px' }}>
+                    {contact.linkedin_url
+                      ? <a href={contact.linkedin_url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ color: '#1e40af', fontSize: 12 }}>View</a>
+                      : '—'}
+                  </td>}
                   {visCol('verified') && (
                     <td style={{ ...fmt.td, padding: '12px 16px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
                       <button onClick={e => toggleVerified(contact, e)}

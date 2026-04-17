@@ -159,6 +159,7 @@ function EditLayoutModal({ tabConfig, views, onSave, onDelete, onClose }) {
 }
 
 const CONTACT_TYPE_OPTIONS = ['Owner', 'Property Manager', 'Attorney', 'Appraiser', 'Accountant', 'Advisor', 'Other']
+const SOURCE_OPTIONS = ['Direct', 'Referral', 'Cold Outreach', 'LinkedIn', 'Website', 'Event', 'Other']
 
 // ── Main Component ─────────────────────────────────────────────────────────
 export default function ContactDetail() {
@@ -233,7 +234,11 @@ export default function ContactDetail() {
     if (error) { console.error(error); setLoading(false); return }
     setLinkedCompany(contactData.company || null)
     setContact(contactData)
-    setForm(contactData)
+    setForm({
+      ...contactData,
+      contact_groups: (contactData.contact_groups || []).join(', '),
+      segments: (contactData.segments || []).join(', '),
+    })
 
     const { data: propsData } = await supabase
       .from('property_contacts')
@@ -249,6 +254,12 @@ export default function ContactDetail() {
     delete updateData.full_name
     delete updateData.created_at
     delete updateData.company   // strip joined relation before upsert
+    updateData.contact_groups = form.contact_groups
+      ? form.contact_groups.split(',').map(s => s.trim()).filter(Boolean)
+      : []
+    updateData.segments = form.segments
+      ? form.segments.split(',').map(s => s.trim()).filter(Boolean)
+      : []
     updateData.updated_at = new Date().toISOString()
     updateData.last_modified_by = user?.user_metadata?.full_name || user?.email || ''
 
@@ -340,9 +351,11 @@ export default function ContactDetail() {
                   </div>
                 </div>
 
-                {/* ── Contact type subtitle ── */}
-                {contact.contact_type && (
-                  <p style={{ margin: '2px 0 6px', fontSize: 13, color: '#64748b', fontWeight: 500 }}>{contact.contact_type}</p>
+                {/* ── Title / contact type subtitle ── */}
+                {(contact.title || contact.contact_type) && (
+                  <p style={{ margin: '2px 0 6px', fontSize: 13, color: '#64748b', fontWeight: 500 }}>
+                    {[contact.title, contact.contact_type].filter(Boolean).join(' · ')}
+                  </p>
                 )}
 
                 {/* ── Linked company line ── */}
@@ -421,70 +434,109 @@ export default function ContactDetail() {
 
         {/* ── EDIT FORM ──────────────────────────────────────────────────── */}
         {editing && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
-            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 20px' }}>
-              <SH title="Contact Info" />
-              <EditField label="First Name"   value={form.first_name}    onChange={v => f('first_name', v)} />
-              <EditField label="Last Name"    value={form.last_name}     onChange={v => f('last_name', v)} />
-              <EditField label="Contact Type" value={form.contact_type}  type="select" options={CONTACT_TYPE_OPTIONS} onChange={v => f('contact_type', v)} />
-              <EditField label="Email"        value={form.email_address} type="email" onChange={v => f('email_address', v)} />
-              <EditField label="Main Phone"   value={form.main_phone}    onChange={v => f('main_phone', v)} />
-              <EditField label="Cell Phone"   value={form.cell_phone}    onChange={v => f('cell_phone', v)} />
-              {/* ── Company picker ── */}
-              <div style={{ marginBottom: 12, position: 'relative' }}>
-                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Company</label>
+          <>
+            {/* Row 1: Contact Info | Address & Notes */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+              <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 20px' }}>
+                <SH title="Contact Info" />
+                <EditField label="First Name"   value={form.first_name}    onChange={v => f('first_name', v)} />
+                <EditField label="Last Name"    value={form.last_name}     onChange={v => f('last_name', v)} />
+                <EditField label="Title"        value={form.title}         onChange={v => f('title', v)} />
+                <EditField label="Contact Type" value={form.contact_type}  type="select" options={CONTACT_TYPE_OPTIONS} onChange={v => f('contact_type', v)} />
+                <EditField label="Email"        value={form.email_address} type="email" onChange={v => f('email_address', v)} />
+                <EditField label="Main Phone"   value={form.main_phone}    onChange={v => f('main_phone', v)} />
+                <EditField label="Cell Phone"   value={form.cell_phone}    onChange={v => f('cell_phone', v)} />
+                {/* ── Company picker ── */}
+                <div style={{ marginBottom: 12, position: 'relative' }}>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Company</label>
+                  {linkedCompany && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 6, marginBottom: 6 }}>
+                      <span style={{ fontSize: 13, color: '#0369a1', fontWeight: 600, flex: 1 }}>🏢 {linkedCompany.company_name}</span>
+                      <button onClick={() => { f('company_id', null); setLinkedCompany(null); setCompanySearch('') }}
+                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 14, padding: '0 2px', lineHeight: 1 }}>✕</button>
+                    </div>
+                  )}
+                  <input type="text" value={companySearch}
+                    onChange={e => { setCompanySearch(e.target.value); searchCompanies(e.target.value); setShowCompanyDropdown(true) }}
+                    onBlur={() => setTimeout(() => setShowCompanyDropdown(false), 150)}
+                    placeholder={linkedCompany ? 'Change company…' : 'Search to link a company…'}
+                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
+                  {showCompanyDropdown && companyResults.length > 0 && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 200, maxHeight: 200, overflowY: 'auto' }}>
+                      {companyResults.map(c => (
+                        <div key={c.id}
+                          onMouseDown={() => { f('company_id', c.id); setLinkedCompany(c); setCompanySearch(''); setShowCompanyDropdown(false) }}
+                          style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 13, color: '#1e293b', borderBottom: '1px solid #f1f5f9' }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                          onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                          {c.company_name}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 20px' }}>
+                <SH title="Address &amp; Notes" />
+                {/* ── Use Company Address toggle ── */}
                 {linkedCompany && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 6, marginBottom: 6 }}>
-                    <span style={{ fontSize: 13, color: '#0369a1', fontWeight: 600, flex: 1 }}>🏢 {linkedCompany.company_name}</span>
-                    <button onClick={() => { f('company_id', null); setLinkedCompany(null); setCompanySearch('') }}
-                      style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 14, padding: '0 2px', lineHeight: 1 }}>✕</button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#f0f9ff', borderRadius: 6, border: '1px solid #bae6fd', marginBottom: 12 }}>
+                    <input type="checkbox" id="useCompanyAddr" checked={!!form.use_company_address}
+                      onChange={e => f('use_company_address', e.target.checked)}
+                      style={{ cursor: 'pointer', accentColor: '#1e40af', width: 15, height: 15 }} />
+                    <label htmlFor="useCompanyAddr" style={{ fontSize: 13, color: '#0369a1', fontWeight: 600, cursor: 'pointer' }}>
+                      Use Company Address
+                    </label>
                   </div>
                 )}
-                <input type="text" value={companySearch}
-                  onChange={e => { setCompanySearch(e.target.value); searchCompanies(e.target.value); setShowCompanyDropdown(true) }}
-                  onBlur={() => setTimeout(() => setShowCompanyDropdown(false), 150)}
-                  placeholder={linkedCompany ? 'Change company…' : 'Search to link a company…'}
-                  style={{ width: '100%', padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
-                {showCompanyDropdown && companyResults.length > 0 && (
-                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 200, maxHeight: 200, overflowY: 'auto' }}>
-                    {companyResults.map(c => (
-                      <div key={c.id}
-                        onMouseDown={() => { f('company_id', c.id); setLinkedCompany(c); setCompanySearch(''); setShowCompanyDropdown(false) }}
-                        style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 13, color: '#1e293b', borderBottom: '1px solid #f1f5f9' }}
-                        onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
-                        onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
-                        {c.company_name}
-                      </div>
-                    ))}
+                <div style={{ opacity: form.use_company_address ? 0.45 : 1, pointerEvents: form.use_company_address ? 'none' : 'auto', transition: 'opacity 0.15s' }}>
+                  <EditField label="Street Address" value={form.address}    onChange={v => f('address', v)} />
+                  <EditField label="Unit / Suite"   value={form.unit_suite} onChange={v => f('unit_suite', v)} />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <EditField label="City"  value={form.city}  onChange={v => f('city', v)} />
+                    <EditField label="State" value={form.state} onChange={v => f('state', v)} />
                   </div>
-                )}
+                  <EditField label="Zip"   value={form.zipcode} onChange={v => f('zipcode', v)} />
+                </div>
+                <EditField label="Notes" value={form.notes} type="textarea" onChange={v => f('notes', v)} />
               </div>
             </div>
-            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 20px' }}>
-              <SH title="Address &amp; Notes" />
-              {/* ── Use Company Address toggle ── */}
-              {linkedCompany && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#f0f9ff', borderRadius: 6, border: '1px solid #bae6fd', marginBottom: 12 }}>
-                  <input type="checkbox" id="useCompanyAddr" checked={!!form.use_company_address}
-                    onChange={e => f('use_company_address', e.target.checked)}
-                    style={{ cursor: 'pointer', accentColor: '#1e40af', width: 15, height: 15 }} />
-                  <label htmlFor="useCompanyAddr" style={{ fontSize: 13, color: '#0369a1', fontWeight: 600, cursor: 'pointer' }}>
-                    Use Company Address
-                  </label>
-                </div>
-              )}
-              <div style={{ opacity: form.use_company_address ? 0.45 : 1, pointerEvents: form.use_company_address ? 'none' : 'auto', transition: 'opacity 0.15s' }}>
-                <EditField label="Street Address" value={form.address}    onChange={v => f('address', v)} />
-                <EditField label="Unit / Suite"   value={form.unit_suite} onChange={v => f('unit_suite', v)} />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <EditField label="City"  value={form.city}  onChange={v => f('city', v)} />
-                  <EditField label="State" value={form.state} onChange={v => f('state', v)} />
-                </div>
-                <EditField label="Zip"   value={form.zipcode} onChange={v => f('zipcode', v)} />
+
+            {/* Row 2: Classification | Social Media */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+              <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 20px' }}>
+                <SH title="Classification" />
+                <EditField label="Contact Group(s) — comma separated" value={form.contact_groups} onChange={v => f('contact_groups', v)} />
+                <EditField label="Segment(s) — comma separated"       value={form.segments}       onChange={v => f('segments', v)} />
+                <EditField label="Source" value={form.source} type="select" options={SOURCE_OPTIONS} onChange={v => f('source', v)} />
               </div>
-              <EditField label="Notes" value={form.notes}   type="textarea" onChange={v => f('notes', v)} />
+              <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 20px' }}>
+                <SH title="Social Media" />
+                <EditField label="LinkedIn URL"  value={form.linkedin_url}  onChange={v => f('linkedin_url', v)} />
+                <EditField label="Facebook URL"  value={form.facebook_url}  onChange={v => f('facebook_url', v)} />
+                <EditField label="Instagram URL" value={form.instagram_url} onChange={v => f('instagram_url', v)} />
+                <EditField label="Twitter URL"   value={form.twitter_url}   onChange={v => f('twitter_url', v)} />
+                <EditField label="YouTube URL"   value={form.youtube_url}   onChange={v => f('youtube_url', v)} />
+              </div>
             </div>
-          </div>
+
+            {/* Row 3: Possible Contact Info — full width, phones | emails */}
+            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 20px', marginBottom: 20 }}>
+              <SH title="Possible Contact Info" />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <EditField label="Poss Phone 1" value={form.poss_phone_1} onChange={v => f('poss_phone_1', v)} />
+                  <EditField label="Poss Phone 2" value={form.poss_phone_2} onChange={v => f('poss_phone_2', v)} />
+                  <EditField label="Poss Phone 3" value={form.poss_phone_3} onChange={v => f('poss_phone_3', v)} />
+                </div>
+                <div>
+                  <EditField label="Poss Email 1" value={form.poss_email_1} type="email" onChange={v => f('poss_email_1', v)} />
+                  <EditField label="Poss Email 2" value={form.poss_email_2} type="email" onChange={v => f('poss_email_2', v)} />
+                  <EditField label="Poss Email 3" value={form.poss_email_3} type="email" onChange={v => f('poss_email_3', v)} />
+                </div>
+              </div>
+            </div>
+          </>
         )}
 
         {/* ── TABBED CONTENT (view mode) ─────────────────────────────────── */}
@@ -507,43 +559,81 @@ export default function ContactDetail() {
 
             {/* Tab content */}
             {activeTab === 'Details' && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
-                <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 20px' }}>
-                  <SH title="Contact Details" />
-                  <ReadField label="First Name"   value={contact.first_name} />
-                  <ReadField label="Last Name"    value={contact.last_name} />
-                  <ReadField label="Contact Type" value={contact.contact_type} />
-                  {linkedCompany && (
-                    <div style={{ padding: '8px 0', borderBottom: '1px solid #f1f5f9' }}>
-                      <p style={{ margin: '0 0 2px', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Company</p>
-                      <span onClick={() => navigate(`/companies/${linkedCompany.id}`)}
-                        style={{ fontSize: 13, color: '#1e40af', cursor: 'pointer', fontWeight: 600 }}>
-                        🏢 {linkedCompany.company_name}
-                      </span>
+              <>
+                {/* Row 1: Contact Details | Address & Notes */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                  <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 20px' }}>
+                    <SH title="Contact Details" />
+                    <ReadField label="First Name"   value={contact.first_name} />
+                    <ReadField label="Last Name"    value={contact.last_name} />
+                    <ReadField label="Title"        value={contact.title} />
+                    <ReadField label="Contact Type" value={contact.contact_type} />
+                    {linkedCompany && (
+                      <div style={{ padding: '8px 0', borderBottom: '1px solid #f1f5f9' }}>
+                        <p style={{ margin: '0 0 2px', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Company</p>
+                        <span onClick={() => navigate(`/companies/${linkedCompany.id}`)}
+                          style={{ fontSize: 13, color: '#1e40af', cursor: 'pointer', fontWeight: 600 }}>
+                          🏢 {linkedCompany.company_name}
+                        </span>
+                      </div>
+                    )}
+                    <ReadField label="Email"      value={contact.email_address} href={contact.email_address ? `mailto:${contact.email_address}` : null} />
+                    <ReadField label="Main Phone" value={contact.main_phone}    href={contact.main_phone ? `tel:${contact.main_phone}` : null} />
+                    <ReadField label="Cell Phone" value={contact.cell_phone}    href={contact.cell_phone ? `tel:${contact.cell_phone}` : null} />
+                  </div>
+                  <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 20px' }}>
+                    <SH title={useCompanyAddr ? 'Address & Notes (from Company)' : 'Address & Notes'} />
+                    {useCompanyAddr && (
+                      <div style={{ display: 'flex', align: 'center', gap: 6, padding: '6px 10px', background: '#f0f9ff', borderRadius: 6, marginBottom: 10, fontSize: 12, color: '#0369a1', fontWeight: 600 }}>
+                        🏢 Showing address from {linkedCompany.company_name}
+                      </div>
+                    )}
+                    <ReadField label="Street Address" value={addrSrc?.address} />
+                    <ReadField label="Unit / Suite"   value={addrSrc?.unit_suite} />
+                    <ReadField label="City"           value={addrSrc?.city} />
+                    <ReadField label="State"          value={addrSrc?.state} />
+                    <ReadField label="Zip"            value={addrSrc?.zipcode} />
+                    <div style={{ padding: '8px 0' }}>
+                      <p style={{ margin: '0 0 4px', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Notes</p>
+                      <p style={{ margin: 0, fontSize: 13, color: contact.notes ? '#1e293b' : '#cbd5e1', whiteSpace: 'pre-wrap' }}>{contact.notes || '—'}</p>
                     </div>
-                  )}
-                  <ReadField label="Email"        value={contact.email_address} href={contact.email_address ? `mailto:${contact.email_address}` : null} />
-                  <ReadField label="Main Phone"   value={contact.main_phone} href={contact.main_phone ? `tel:${contact.main_phone}` : null} />
-                  <ReadField label="Cell Phone"   value={contact.cell_phone} href={contact.cell_phone ? `tel:${contact.cell_phone}` : null} />
-                </div>
-                <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 20px' }}>
-                  <SH title={useCompanyAddr ? 'Address & Notes (from Company)' : 'Address & Notes'} />
-                  {useCompanyAddr && (
-                    <div style={{ display: 'flex', align: 'center', gap: 6, padding: '6px 10px', background: '#f0f9ff', borderRadius: 6, marginBottom: 10, fontSize: 12, color: '#0369a1', fontWeight: 600 }}>
-                      🏢 Showing address from {linkedCompany.company_name}
-                    </div>
-                  )}
-                  <ReadField label="Street Address" value={addrSrc?.address} />
-                  <ReadField label="Unit / Suite"   value={addrSrc?.unit_suite} />
-                  <ReadField label="City"           value={addrSrc?.city} />
-                  <ReadField label="State"          value={addrSrc?.state} />
-                  <ReadField label="Zip"            value={addrSrc?.zipcode} />
-                  <div style={{ padding: '8px 0' }}>
-                    <p style={{ margin: '0 0 4px', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Notes</p>
-                    <p style={{ margin: 0, fontSize: 13, color: contact.notes ? '#1e293b' : '#cbd5e1', whiteSpace: 'pre-wrap' }}>{contact.notes || '—'}</p>
                   </div>
                 </div>
-              </div>
+
+                {/* Row 2: Classification | Social Media */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                  <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 20px' }}>
+                    <SH title="Classification" />
+                    <ReadField label="Contact Group(s)" value={(contact.contact_groups || []).join(', ')} />
+                    <ReadField label="Segment(s)"       value={(contact.segments || []).join(', ')} />
+                    <ReadField label="Source"           value={contact.source} />
+                  </div>
+                  <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 20px' }}>
+                    <SH title="Social Media" />
+                    <ReadField label="LinkedIn"  value={contact.linkedin_url}  href={contact.linkedin_url  || null} />
+                    <ReadField label="Facebook"  value={contact.facebook_url}  href={contact.facebook_url  || null} />
+                    <ReadField label="Instagram" value={contact.instagram_url} href={contact.instagram_url || null} />
+                    <ReadField label="Twitter"   value={contact.twitter_url}   href={contact.twitter_url   || null} />
+                    <ReadField label="YouTube"   value={contact.youtube_url}   href={contact.youtube_url   || null} />
+                  </div>
+                </div>
+
+                {/* Row 3: Possible Phones | Possible Emails */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+                  <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 20px' }}>
+                    <SH title="Possible Phones" />
+                    <ReadField label="Poss Phone 1" value={contact.poss_phone_1} href={contact.poss_phone_1 ? `tel:${contact.poss_phone_1}` : null} />
+                    <ReadField label="Poss Phone 2" value={contact.poss_phone_2} href={contact.poss_phone_2 ? `tel:${contact.poss_phone_2}` : null} />
+                    <ReadField label="Poss Phone 3" value={contact.poss_phone_3} href={contact.poss_phone_3 ? `tel:${contact.poss_phone_3}` : null} />
+                  </div>
+                  <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 20px' }}>
+                    <SH title="Possible Emails" />
+                    <ReadField label="Poss Email 1" value={contact.poss_email_1} href={contact.poss_email_1 ? `mailto:${contact.poss_email_1}` : null} />
+                    <ReadField label="Poss Email 2" value={contact.poss_email_2} href={contact.poss_email_2 ? `mailto:${contact.poss_email_2}` : null} />
+                    <ReadField label="Poss Email 3" value={contact.poss_email_3} href={contact.poss_email_3 ? `mailto:${contact.poss_email_3}` : null} />
+                  </div>
+                </div>
+              </>
             )}
 
             {activeTab === 'LinkedProperties' && (
