@@ -8,27 +8,28 @@ import { useState, useRef, useEffect } from 'react'
  *  - count: number
  *  - onAdd: () => void
  *  - addLabel: string
- *  - onImport: () => void         (optional)
- *  - onExport: () => void         (optional)
+ *  - onImport: () => void              (optional — shown in More Tools)
+ *  - onExport: () => void              (optional — shown in More Tools)
+ *  - onFindDuplicates: () => void      (optional — shown in More Tools)
  *  - columns: [{key, label, visible}]
  *  - onColumnsChange: (cols) => void
  *  - selectedIds: string[]
  *  - massReplaceFields: [{key, label, type, options}]
  *  - onMassReplace: ({field, value, ids}) => void
- *  - viewMode: 'list'|'icon'|'map'   (optional, for Properties)
- *  - onViewChange: (mode) => void    (optional)
+ *  - viewMode: 'list'|'icon'|'map'     (optional, for Properties)
+ *  - onViewChange: (mode) => void      (optional)
  *  - showViewToggle: bool
  *  ── Saved list views ─────────────────────────────────────────────────────
- *  - savedViews: [{id, name}]        (optional)
- *  - activeViewId: string|null       (optional)
- *  - onLoadView: (id, config) => void (optional)
- *  - onSaveView: (name) => Promise   (optional)  — saves current columns
- *  - onDeleteView: (id) => void      (optional)
+ *  - savedViews: [{id, name}]
+ *  - activeViewId: string|null
+ *  - onLoadView: (id, config) => void
+ *  - onSaveView: (name) => Promise
+ *  - onDeleteView: (id) => void
  */
 export default function RecordToolbar({
   title, count,
   onAdd, addLabel = '+ Add',
-  onImport, onExport,
+  onImport, onExport, onFindDuplicates,
   columns = [], onColumnsChange,
   selectedIds = [],
   massReplaceFields = [], onMassReplace,
@@ -37,24 +38,30 @@ export default function RecordToolbar({
   savedViews = [], activeViewId = null,
   onLoadView, onSaveView, onDeleteView,
 }) {
-  const [showColumns, setShowColumns]       = useState(false)
+  const [showColumns, setShowColumns]         = useState(false)
+  const [showMoreTools, setShowMoreTools]     = useState(false)
   const [showMassReplace, setShowMassReplace] = useState(false)
-  const [mrField, setMrField]               = useState('')
-  const [mrValue, setMrValue]               = useState('')
+  const [mrField, setMrField]                 = useState('')
+  const [mrValue, setMrValue]                 = useState('')
 
   // Saved-view UI state (lives inside the columns panel)
-  const [showSaveInput, setShowSaveInput]   = useState(false)
-  const [saveName, setSaveName]             = useState('')
-  const [saving, setSaving]                 = useState(false)
+  const [showSaveInput, setShowSaveInput] = useState(false)
+  const [saveName, setSaveName]           = useState('')
+  const [saving, setSaving]               = useState(false)
 
-  const columnsRef = useRef(null)
+  const columnsRef    = useRef(null)
+  const moreToolsRef  = useRef(null)
 
+  // Close dropdowns on outside click
   useEffect(() => {
     function handleClick(e) {
       if (columnsRef.current && !columnsRef.current.contains(e.target)) {
         setShowColumns(false)
         setShowSaveInput(false)
         setSaveName('')
+      }
+      if (moreToolsRef.current && !moreToolsRef.current.contains(e.target)) {
+        setShowMoreTools(false)
       }
     }
     document.addEventListener('mousedown', handleClick)
@@ -83,8 +90,11 @@ export default function RecordToolbar({
     setShowSaveInput(false)
   }
 
-  const mrFieldDef = massReplaceFields.find(f => f.key === mrField)
-  const activeView = savedViews.find(v => v.id === activeViewId)
+  const mrFieldDef  = massReplaceFields.find(f => f.key === mrField)
+  const activeView  = savedViews.find(v => v.id === activeViewId)
+
+  // Determine which tools appear in the More Tools dropdown
+  const hasMoreTools = onImport || onExport || onFindDuplicates || massReplaceFields.length > 0
 
   return (
     <div style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', padding: '14px 24px' }}>
@@ -137,20 +147,15 @@ export default function RecordToolbar({
             </div>
           )}
 
-          {/* Import */}
-          {onImport && (
-            <ToolbarBtn icon={importIcon} label="Import" onClick={onImport} />
-          )}
-
-          {/* Export */}
-          {onExport && (
-            <ToolbarBtn icon={exportIcon} label="Export" onClick={onExport} />
-          )}
-
           {/* Columns picker + saved views */}
           {columns.length > 0 && (
             <div ref={columnsRef} style={{ position: 'relative' }}>
-              <ToolbarBtn icon={columnsIcon} label="Columns" onClick={() => setShowColumns(!showColumns)} active={showColumns} />
+              <ToolbarBtn
+                icon={columnsIcon}
+                label={`Columns${columns.filter(c => c.visible !== false).length > 0 ? ` (${columns.filter(c => c.visible !== false).length})` : ''}`}
+                onClick={() => { setShowColumns(!showColumns); setShowMoreTools(false) }}
+                active={showColumns}
+              />
               {showColumns && (
                 <div style={{
                   position: 'absolute', top: 'calc(100% + 6px)', right: 0,
@@ -185,7 +190,6 @@ export default function RecordToolbar({
                         Saved Views
                       </div>
 
-                      {/* List of saved views */}
                       {savedViews.length === 0 && (
                         <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic', marginBottom: 8 }}>No saved views yet</div>
                       )}
@@ -198,7 +202,7 @@ export default function RecordToolbar({
                               fontSize: 13, cursor: 'pointer', padding: '3px 6px', borderRadius: 5,
                               color: activeViewId === v.id ? '#1e40af' : '#1e293b',
                               fontWeight: activeViewId === v.id ? 700 : 400,
-                              background: activeViewId === v.id ? '#eff6ff' : 'transparent',
+                              backgroundColor: activeViewId === v.id ? '#eff6ff' : 'transparent',
                             }}
                           >
                             {v.name}
@@ -215,7 +219,6 @@ export default function RecordToolbar({
                         </div>
                       ))}
 
-                      {/* Save current view as... */}
                       {onSaveView && (
                         <div style={{ marginTop: 8 }}>
                           {showSaveInput ? (
@@ -253,7 +256,6 @@ export default function RecordToolbar({
                         </div>
                       )}
 
-                      {/* Default / reset */}
                       {activeViewId && onLoadView && (
                         <button
                           onClick={() => { onLoadView(null, null); setShowColumns(false) }}
@@ -269,9 +271,67 @@ export default function RecordToolbar({
             </div>
           )}
 
-          {/* Mass Replace */}
-          {massReplaceFields.length > 0 && selectedIds.length > 0 && (
-            <ToolbarBtn icon={massReplaceIcon} label={`Replace (${selectedIds.length})`} onClick={() => setShowMassReplace(true)} highlight />
+          {/* ── More Tools dropdown ─────────────────────────────────────────── */}
+          {hasMoreTools && (
+            <div ref={moreToolsRef} style={{ position: 'relative' }}>
+              <ToolbarBtn
+                icon={moreToolsIcon}
+                label="More Tools ▾"
+                onClick={() => { setShowMoreTools(!showMoreTools); setShowColumns(false) }}
+                active={showMoreTools}
+              />
+              {showMoreTools && (
+                <div style={{
+                  position: 'absolute', top: 'calc(100% + 6px)', right: 0,
+                  background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10,
+                  padding: '6px 0', minWidth: 200,
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 200
+                }}>
+
+                  {/* Find Duplicates */}
+                  {onFindDuplicates && (
+                    <MoreToolsItem
+                      icon={findDupIcon}
+                      label="Find Duplicates"
+                      onClick={() => { setShowMoreTools(false); onFindDuplicates() }}
+                    />
+                  )}
+
+                  {/* Mass Replace */}
+                  {massReplaceFields.length > 0 && (
+                    <MoreToolsItem
+                      icon={massReplaceIcon}
+                      label={selectedIds.length > 0 ? `Mass Replace (${selectedIds.length})` : 'Mass Replace'}
+                      onClick={() => { setShowMoreTools(false); setShowMassReplace(true) }}
+                      highlight={selectedIds.length > 0}
+                    />
+                  )}
+
+                  {/* Divider before import/export */}
+                  {(onImport || onExport) && (onFindDuplicates || massReplaceFields.length > 0) && (
+                    <div style={{ height: 1, background: '#f1f5f9', margin: '6px 0' }} />
+                  )}
+
+                  {/* Import */}
+                  {onImport && (
+                    <MoreToolsItem
+                      icon={importIcon}
+                      label="Import Records"
+                      onClick={() => { setShowMoreTools(false); onImport() }}
+                    />
+                  )}
+
+                  {/* Export CSV */}
+                  {onExport && (
+                    <MoreToolsItem
+                      icon={exportIcon}
+                      label="Export CSV"
+                      onClick={() => { setShowMoreTools(false); onExport() }}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
           )}
 
           {/* Primary add button */}
@@ -302,62 +362,71 @@ export default function RecordToolbar({
           }}>
             <h3 style={{ fontSize: 17, fontWeight: 700, color: '#1e293b', margin: '0 0 4px 0' }}>Mass Replace</h3>
             <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 20px 0' }}>
-              Update <strong>{selectedIds.length}</strong> selected record{selectedIds.length !== 1 ? 's' : ''}.
+              {selectedIds.length > 0
+                ? <>Update <strong>{selectedIds.length}</strong> selected record{selectedIds.length !== 1 ? 's' : ''}.</>
+                : 'Select records in the list first, then use Mass Replace to update them in bulk.'
+              }
             </p>
 
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 6 }}>Field</label>
-              <select
-                value={mrField}
-                onChange={e => { setMrField(e.target.value); setMrValue('') }}
-                style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13 }}
-              >
-                <option value="">Select field...</option>
-                {massReplaceFields.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
-              </select>
-            </div>
-
-            {mrField && (
-              <div style={{ marginBottom: 20 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 6 }}>New Value</label>
-                {mrFieldDef?.type === 'select' ? (
+            {selectedIds.length > 0 && (
+              <>
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 6 }}>Field</label>
                   <select
-                    value={mrValue}
-                    onChange={e => setMrValue(e.target.value)}
+                    value={mrField}
+                    onChange={e => { setMrField(e.target.value); setMrValue('') }}
                     style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13 }}
                   >
-                    <option value="">Select...</option>
-                    {mrFieldDef.options.map(o => <option key={o} value={o}>{o}</option>)}
+                    <option value="">Select field...</option>
+                    {massReplaceFields.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
                   </select>
-                ) : (
-                  <input
-                    type={mrFieldDef?.type || 'text'}
-                    value={mrValue}
-                    onChange={e => setMrValue(e.target.value)}
-                    placeholder="Enter new value..."
-                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, boxSizing: 'border-box' }}
-                  />
+                </div>
+
+                {mrField && (
+                  <div style={{ marginBottom: 20 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 6 }}>New Value</label>
+                    {mrFieldDef?.type === 'select' ? (
+                      <select
+                        value={mrValue}
+                        onChange={e => setMrValue(e.target.value)}
+                        style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13 }}
+                      >
+                        <option value="">Select...</option>
+                        {mrFieldDef.options.map(o => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                    ) : (
+                      <input
+                        type={mrFieldDef?.type || 'text'}
+                        value={mrValue}
+                        onChange={e => setMrValue(e.target.value)}
+                        placeholder="Enter new value..."
+                        style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, boxSizing: 'border-box' }}
+                      />
+                    )}
+                  </div>
                 )}
-              </div>
+              </>
             )}
 
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-              <button onClick={() => setShowMassReplace(false)} style={{
+              <button onClick={() => { setShowMassReplace(false); setMrField(''); setMrValue('') }} style={{
                 padding: '7px 16px', border: '1px solid #e2e8f0', borderRadius: 8,
                 background: '#fff', color: '#1e293b', fontSize: 13, fontWeight: 600, cursor: 'pointer'
               }}>Cancel</button>
-              <button
-                onClick={handleMassReplace}
-                disabled={!mrField || mrValue === ''}
-                style={{
-                  padding: '7px 16px', background: '#1e40af', color: '#fff',
-                  border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600,
-                  cursor: (!mrField || mrValue === '') ? 'not-allowed' : 'pointer',
-                  opacity: (!mrField || mrValue === '') ? 0.5 : 1
-                }}
-              >
-                Apply to {selectedIds.length} record{selectedIds.length !== 1 ? 's' : ''}
-              </button>
+              {selectedIds.length > 0 && (
+                <button
+                  onClick={handleMassReplace}
+                  disabled={!mrField || mrValue === ''}
+                  style={{
+                    padding: '7px 16px', background: '#1e40af', color: '#fff',
+                    border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                    cursor: (!mrField || mrValue === '') ? 'not-allowed' : 'pointer',
+                    opacity: (!mrField || mrValue === '') ? 0.5 : 1
+                  }}
+                >
+                  Apply to {selectedIds.length} record{selectedIds.length !== 1 ? 's' : ''}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -365,6 +434,8 @@ export default function RecordToolbar({
     </div>
   )
 }
+
+// ── Sub-components ─────────────────────────────────────────────────────────────
 
 function ToolbarBtn({ icon, label, onClick, active, highlight }) {
   const [hovered, setHovered] = useState(false)
@@ -390,6 +461,31 @@ function ToolbarBtn({ icon, label, onClick, active, highlight }) {
   )
 }
 
+function MoreToolsItem({ icon, label, onClick, highlight }) {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        width: '100%', padding: '9px 16px',
+        background: hovered ? '#f8fafc' : 'transparent',
+        border: 'none', cursor: 'pointer',
+        color: highlight ? '#1e40af' : '#1e293b',
+        fontSize: 13, fontWeight: highlight ? 600 : 400,
+        textAlign: 'left', transition: 'background 0.1s',
+      }}
+    >
+      <span style={{ color: '#64748b', display: 'flex', alignItems: 'center' }}>{icon}</span>
+      {label}
+    </button>
+  )
+}
+
+// ── Icons ──────────────────────────────────────────────────────────────────────
+
 const listViewIcon = (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
@@ -409,13 +505,13 @@ const mapViewIcon = (
   </svg>
 )
 const importIcon = (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
     <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
   </svg>
 )
 const exportIcon = (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
     <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
   </svg>
@@ -427,8 +523,19 @@ const columnsIcon = (
   </svg>
 )
 const massReplaceIcon = (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
     <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+  </svg>
+)
+const findDupIcon = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    <line x1="8" y1="11" x2="14" y2="11"/><line x1="11" y1="8" x2="11" y2="14"/>
+  </svg>
+)
+const moreToolsIcon = (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="5" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="12" cy="19" r="1" fill="currentColor"/>
   </svg>
 )

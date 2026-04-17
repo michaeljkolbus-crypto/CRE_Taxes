@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { fmt } from '../../lib/theme'
 import RecordToolbar from '../../components/shared/RecordToolbar'
+import Pagination from '../../components/shared/Pagination'
 import { useViewPreferences } from '../../hooks/useViewPreferences'
+import { useResizableColumns } from '../../hooks/useResizableColumns'
 import { useAuth } from '../../context/AuthContext'
 import { ExcelImporter } from '../../components/shared/ExcelImporter'
 
@@ -313,6 +315,7 @@ export function PropertiesPage() {
 
   // ── Saved list views ────────────────────────────────────────────────────
   const { views: savedViews, saveView, deleteView } = useViewPreferences('property_list')
+  const { widths, startResize, resizeHandleStyle } = useResizableColumns(ALL_COLUMNS, 130)
 
   const handleLoadView = useCallback((viewId, config) => {
     setActiveViewId(viewId)
@@ -348,9 +351,9 @@ export function PropertiesPage() {
     }
   }, [activeViewId, deleteView])
 
-  const pageSize = 50
+  const [pageSize, setPageSize] = useState(50)
 
-  useEffect(() => { fetchProperties() }, [search, county, propertyType, appealPropType, page, sortField, sortAsc])
+  useEffect(() => { fetchProperties() }, [search, county, propertyType, appealPropType, page, pageSize, sortField, sortAsc])
 
   const fetchProperties = async () => {
     setLoading(true)
@@ -430,9 +433,15 @@ export function PropertiesPage() {
       color: sortField === field ? '#1e40af' : '#64748b',
       textTransform: 'uppercase', letterSpacing: '0.05em',
       backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', userSelect: 'none',
-      whiteSpace: 'nowrap'
+      whiteSpace: 'nowrap', position: 'relative',
+      width: widths[field] || 130, minWidth: 60,
     }}>
       {label} {sortField === field ? (sortAsc ? '↑' : '↓') : ''}
+      <span
+        style={resizeHandleStyle}
+        onMouseDown={e => { e.stopPropagation(); startResize(field, e) }}
+        onClick={e => e.stopPropagation()}
+      />
     </th>
   )
 
@@ -506,13 +515,12 @@ export function PropertiesPage() {
                 {properties.map(p => <PropertyCard key={p.id} prop={p} onClick={id => navigate(`/properties/${id}`)} />)}
               </div>
           }
-          <PaginationRow page={page} setPage={setPage} totalCount={totalCount} pageSize={pageSize} properties={properties} />
         </div>
       ) : (
         /* ── List View ── */
-        <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 24px 0' }}>
           <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: 10, background: '#fff' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
               <thead>
                 <tr>
                   <th style={{ padding: '10px 12px', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', width: 36 }}>
@@ -544,9 +552,16 @@ export function PropertiesPage() {
             </table>
           </div>
           {properties.length === 0 && <div style={{ textAlign: 'center', padding: 40, color: '#64748b', fontSize: 13 }}>No properties found.</div>}
-          <PaginationRow page={page} setPage={setPage} totalCount={totalCount} pageSize={pageSize} properties={properties} />
         </div>
       )}
+
+      <Pagination
+        total={totalCount}
+        page={page}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={(s) => { setPageSize(s); setPage(0) }}
+      />
 
       <AddPropertyModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} onSave={id => { setShowAddModal(false); navigate(`/properties/${id}`) }} />
       {showImport && (
@@ -557,20 +572,6 @@ export function PropertiesPage() {
           onDone={() => { setShowImport(false); fetchProperties() }}
         />
       )}
-    </div>
-  )
-}
-
-function PaginationRow({ page, setPage, totalCount, pageSize, properties }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
-      <div style={{ fontSize: 12, color: '#64748b' }}>
-        Showing {properties.length > 0 ? page * pageSize + 1 : 0}–{Math.min((page + 1) * pageSize, totalCount)} of {totalCount}
-      </div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0} style={{ padding: '7px 16px', border: '1px solid #e2e8f0', borderRadius: 8, background: '#fff', color: '#1e293b', fontSize: 13, fontWeight: 600, cursor: page === 0 ? 'not-allowed' : 'pointer', opacity: page === 0 ? 0.5 : 1 }}>Previous</button>
-        <button onClick={() => setPage(page + 1)} disabled={(page + 1) * pageSize >= totalCount} style={{ padding: '7px 16px', border: '1px solid #e2e8f0', borderRadius: 8, background: '#fff', color: '#1e293b', fontSize: 13, fontWeight: 600, cursor: (page + 1) * pageSize >= totalCount ? 'not-allowed' : 'pointer', opacity: (page + 1) * pageSize >= totalCount ? 0.5 : 1 }}>Next</button>
-      </div>
     </div>
   )
 }

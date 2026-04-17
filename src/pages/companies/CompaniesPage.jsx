@@ -4,47 +4,51 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { fmt } from '../../lib/theme'
 import RecordToolbar from '../../components/shared/RecordToolbar'
+import Pagination from '../../components/shared/Pagination'
 import { useViewPreferences } from '../../hooks/useViewPreferences'
+import { useResizableColumns } from '../../hooks/useResizableColumns'
 import { ExcelImporter } from '../../components/shared/ExcelImporter'
 
-const PAGE_SIZE = 50
+const DEFAULT_PAGE_SIZE = 50
 
 const ALL_COLUMNS = [
-  { key: 'company_name',     label: 'Company Name',  visible: true  },
-  { key: 'company_type',     label: 'Type',           visible: true  },
-  { key: 'company_phone',    label: 'Phone',          visible: true  },
-  { key: 'city',             label: 'City',           visible: true  },
-  { key: 'company_website',  label: 'Website',        visible: true  },
-  { key: 'verified',         label: 'Verified',       visible: false },
-  { key: 'last_modified_by', label: 'Modified By',    visible: false },
-  { key: 'updated_at',       label: 'Last Modified',  visible: false },
+  { key: 'company_name',     label: 'Company Name',  visible: true,  defaultWidth: 220 },
+  { key: 'company_type',     label: 'Type',           visible: true,  defaultWidth: 130 },
+  { key: 'company_phone',    label: 'Phone',          visible: true,  defaultWidth: 140 },
+  { key: 'city',             label: 'City',           visible: true,  defaultWidth: 120 },
+  { key: 'company_website',  label: 'Website',        visible: true,  defaultWidth: 110 },
+  { key: 'verified',         label: 'Verified',       visible: false, defaultWidth: 100 },
+  { key: 'last_modified_by', label: 'Modified By',    visible: false, defaultWidth: 130 },
+  { key: 'updated_at',       label: 'Last Modified',  visible: false, defaultWidth: 130 },
 ]
 
 export default function CompaniesPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [companies, setCompanies] = useState([])
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(0)
-  const [search, setSearch] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [showModal, setShowModal] = useState(false)
+  const [companies, setCompanies]   = useState([])
+  const [total, setTotal]           = useState(0)
+  const [page, setPage]             = useState(0)
+  const [pageSize, setPageSize]     = useState(DEFAULT_PAGE_SIZE)
+  const [search, setSearch]         = useState('')
+  const [loading, setLoading]       = useState(false)
+  const [showModal, setShowModal]   = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [selectedIds, setSelectedIds] = useState([])
-  const [columns, setColumns] = useState(ALL_COLUMNS)
+  const [columns, setColumns]       = useState(ALL_COLUMNS)
   const [activeViewId, setActiveViewId] = useState(null)
   const [form, setForm] = useState({
     company_name: '', company_type: '', company_phone: '', city: '', state: 'IL'
   })
 
   const { views, saveView, deleteView } = useViewPreferences('companies_list')
+  const { widths, startResize, resizeHandleStyle } = useResizableColumns(ALL_COLUMNS)
 
-  useEffect(() => { fetchCompanies() }, [page, search])
+  useEffect(() => { fetchCompanies() }, [page, pageSize, search])
 
   const fetchCompanies = async () => {
     setLoading(true)
-    const from = page * PAGE_SIZE
-    const to   = from + PAGE_SIZE - 1
+    const from = page * pageSize
+    const to   = from + pageSize - 1
     let query = supabase.from('companies').select('*', { count: 'exact' })
     if (search) query = query.or(`company_name.ilike.%${search}%,city.ilike.%${search}%`)
     query = query.order('company_name', { ascending: true }).range(from, to)
@@ -59,7 +63,7 @@ export default function CompaniesPage() {
     const orderedKeys = savedCols.map(c => c.key)
     const merged = [
       ...orderedKeys.map(k => {
-        const base = ALL_COLUMNS.find(c => c.key === k)
+        const base  = ALL_COLUMNS.find(c => c.key === k)
         const saved = savedCols.find(c => c.key === k)
         return base ? { ...base, visible: saved.visible } : null
       }).filter(Boolean),
@@ -109,14 +113,31 @@ export default function CompaniesPage() {
     )
     const csv = [header, ...rows].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href = url; a.download = 'companies.csv'; a.click()
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a'); a.href = url; a.download = 'companies.csv'; a.click()
     URL.revokeObjectURL(url)
   }
 
+  // ── Row selection ────────────────────────────────────────────────────────
+  function toggleSelect(id, e) {
+    e.stopPropagation()
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+  function toggleSelectAll(e) {
+    e.stopPropagation()
+    setSelectedIds(prev => prev.length === companies.length ? [] : companies.map(c => c.id))
+  }
+
   const visCol = (key) => columns.find(c => c.key === key)?.visible !== false
-  const fromRow = page * PAGE_SIZE + 1
-  const toRow   = Math.min((page + 1) * PAGE_SIZE, total)
+
+  const thStyle = (key) => ({
+    ...fmt.th,
+    padding: '12px 16px',
+    position: 'relative',
+    width: widths[key],
+    minWidth: 60,
+    userSelect: 'none',
+  })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -136,81 +157,136 @@ export default function CompaniesPage() {
         onSaveView={handleSaveView}
         onDeleteView={handleDeleteView}
       />
+
+      {/* Search bar */}
       <div style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', padding: '10px 24px' }}>
         <input type="text" placeholder="Search by company name or city..." value={search}
           onChange={e => { setSearch(e.target.value); setPage(0) }}
-          style={{ border:'1px solid #d1d5db', borderRadius:8, padding:'6px 12px', width:280, fontSize:13 }} />
+          style={{ border: '1px solid #d1d5db', borderRadius: 8, padding: '6px 12px', width: 280, fontSize: 13 }} />
       </div>
-      <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+
+      {/* Table */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 24px 0' }}>
         <div style={{ backgroundColor: '#fff', borderRadius: 8, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0 }}>
-              <tr>
-                {visCol('company_name')    && <th style={{ ...fmt.th, textAlign: 'left', padding: '12px 16px' }}>Company Name</th>}
-                {visCol('company_type')    && <th style={{ ...fmt.th, padding: '12px 16px' }}>Type</th>}
-                {visCol('company_phone')   && <th style={{ ...fmt.th, padding: '12px 16px' }}>Phone</th>}
-                {visCol('city')            && <th style={{ ...fmt.th, padding: '12px 16px' }}>City</th>}
-                {visCol('company_website') && <th style={{ ...fmt.th, padding: '12px 16px' }}>Website</th>}
-                {visCol('verified')         && <th style={{ ...fmt.th, padding: '12px 16px' }}>Verified</th>}
-                {visCol('last_modified_by') && <th style={{ ...fmt.th, padding: '12px 16px' }}>Modified By</th>}
-                {visCol('updated_at')       && <th style={{ ...fmt.th, padding: '12px 16px' }}>Last Modified</th>}
-                <th style={{ ...fmt.th, padding: '12px 16px' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {companies.map((company, idx) => (
-                <tr key={company.id}
-                  style={{ backgroundColor: idx % 2 === 0 ? '#fff' : '#f8fafc', borderBottom: '1px solid #e2e8f0', cursor: 'pointer' }}
-                  onClick={() => navigate(`/companies/${company.id}`)}>
-                  {visCol('company_name')    && <td style={{ ...fmt.td, textAlign: 'left', padding: '12px 16px' }}>{company.company_name}</td>}
-                  {visCol('company_type')    && <td style={{ ...fmt.td, padding: '12px 16px' }}>{company.company_type || '—'}</td>}
-                  {visCol('company_phone')   && <td style={{ ...fmt.td, padding: '12px 16px' }}>{company.company_phone || '—'}</td>}
-                  {visCol('city')            && <td style={{ ...fmt.td, padding: '12px 16px' }}>{company.city || '—'}</td>}
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+              <thead style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0 }}>
+                <tr>
+                  {/* Checkbox */}
+                  <th style={{ ...fmt.th, width: 40, padding: '12px 8px', textAlign: 'center' }}>
+                    <input type="checkbox"
+                      checked={companies.length > 0 && selectedIds.length === companies.length}
+                      onChange={toggleSelectAll}
+                      style={{ accentColor: '#1e40af', cursor: 'pointer' }}
+                    />
+                  </th>
+                  {visCol('company_name') && (
+                    <th style={{ ...thStyle('company_name'), textAlign: 'left' }}>
+                      Company Name
+                      <span style={resizeHandleStyle} onMouseDown={e => startResize('company_name', e)} />
+                    </th>
+                  )}
+                  {visCol('company_type') && (
+                    <th style={thStyle('company_type')}>
+                      Type
+                      <span style={resizeHandleStyle} onMouseDown={e => startResize('company_type', e)} />
+                    </th>
+                  )}
+                  {visCol('company_phone') && (
+                    <th style={thStyle('company_phone')}>
+                      Phone
+                      <span style={resizeHandleStyle} onMouseDown={e => startResize('company_phone', e)} />
+                    </th>
+                  )}
+                  {visCol('city') && (
+                    <th style={thStyle('city')}>
+                      City
+                      <span style={resizeHandleStyle} onMouseDown={e => startResize('city', e)} />
+                    </th>
+                  )}
                   {visCol('company_website') && (
-                    <td style={{ ...fmt.td, padding: '12px 16px' }} onClick={e => e.stopPropagation()}>
-                      {company.company_website ? (
-                        <a href={company.company_website} target="_blank" rel="noopener noreferrer"
-                          style={{ color: '#1e40af', textDecoration: 'none', fontSize: 12 }}>Visit</a>
-                      ) : '—'}
-                    </td>
+                    <th style={thStyle('company_website')}>
+                      Website
+                      <span style={resizeHandleStyle} onMouseDown={e => startResize('company_website', e)} />
+                    </th>
                   )}
                   {visCol('verified') && (
+                    <th style={thStyle('verified')}>
+                      Verified
+                      <span style={resizeHandleStyle} onMouseDown={e => startResize('verified', e)} />
+                    </th>
+                  )}
+                  {visCol('last_modified_by') && (
+                    <th style={thStyle('last_modified_by')}>
+                      Modified By
+                      <span style={resizeHandleStyle} onMouseDown={e => startResize('last_modified_by', e)} />
+                    </th>
+                  )}
+                  {visCol('updated_at') && (
+                    <th style={thStyle('updated_at')}>
+                      Last Modified
+                      <span style={resizeHandleStyle} onMouseDown={e => startResize('updated_at', e)} />
+                    </th>
+                  )}
+                  <th style={{ ...fmt.th, width: 80, padding: '12px 16px' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {companies.map((company, idx) => (
+                  <tr key={company.id}
+                    style={{ backgroundColor: selectedIds.includes(company.id) ? '#eff6ff' : idx % 2 === 0 ? '#fff' : '#f8fafc', borderBottom: '1px solid #e2e8f0', cursor: 'pointer' }}
+                    onClick={() => navigate(`/companies/${company.id}`)}>
+                    <td style={{ ...fmt.td, width: 40, padding: '12px 8px', textAlign: 'center' }} onClick={e => toggleSelect(company.id, e)}>
+                      <input type="checkbox" checked={selectedIds.includes(company.id)} onChange={() => {}} style={{ accentColor: '#1e40af', cursor: 'pointer' }} />
+                    </td>
+                    {visCol('company_name')    && <td style={{ ...fmt.td, textAlign: 'left', padding: '12px 16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{company.company_name}</td>}
+                    {visCol('company_type')    && <td style={{ ...fmt.td, padding: '12px 16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{company.company_type || '—'}</td>}
+                    {visCol('company_phone')   && <td style={{ ...fmt.td, padding: '12px 16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{company.company_phone || '—'}</td>}
+                    {visCol('city')            && <td style={{ ...fmt.td, padding: '12px 16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{company.city || '—'}</td>}
+                    {visCol('company_website') && (
+                      <td style={{ ...fmt.td, padding: '12px 16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>
+                        {company.company_website ? (
+                          <a href={company.company_website} target="_blank" rel="noopener noreferrer"
+                            style={{ color: '#1e40af', textDecoration: 'none', fontSize: 12 }}>Visit</a>
+                        ) : '—'}
+                      </td>
+                    )}
+                    {visCol('verified') && (
+                      <td style={{ ...fmt.td, padding: '12px 16px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                        <button onClick={e => toggleVerified(company, e)}
+                          style={{ padding: '3px 10px', borderRadius: 99, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 700,
+                            background: company.verified ? '#dcfce7' : '#f1f5f9', color: company.verified ? '#16a34a' : '#94a3b8' }}>
+                          {company.verified ? '✓ Verified' : 'Verify'}
+                        </button>
+                      </td>
+                    )}
+                    {visCol('last_modified_by') && <td style={{ ...fmt.td, padding: '12px 16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{company.last_modified_by || '—'}</td>}
+                    {visCol('updated_at')       && <td style={{ ...fmt.td, padding: '12px 16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{company.updated_at ? new Date(company.updated_at).toLocaleDateString() : '—'}</td>}
                     <td style={{ ...fmt.td, padding: '12px 16px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-                      <button onClick={e => toggleVerified(company, e)}
-                        style={{ padding: '3px 10px', borderRadius: 99, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 700,
-                          background: company.verified ? '#dcfce7' : '#f1f5f9', color: company.verified ? '#16a34a' : '#94a3b8' }}>
-                        {company.verified ? '✓ Verified' : 'Verify'}
+                      <button onClick={() => navigate(`/companies/${company.id}`)}
+                        style={{ padding: '4px 8px', backgroundColor: '#1e40af', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>
+                        View
                       </button>
                     </td>
-                  )}
-                  {visCol('last_modified_by') && <td style={{ ...fmt.td, padding: '12px 16px' }}>{company.last_modified_by || '—'}</td>}
-                  {visCol('updated_at')       && <td style={{ ...fmt.td, padding: '12px 16px' }}>{company.updated_at ? new Date(company.updated_at).toLocaleDateString() : '—'}</td>}
-                  <td style={{ ...fmt.td, padding: '12px 16px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-                    <button onClick={() => navigate(`/companies/${company.id}`)}
-                      style={{ padding: '4px 8px', backgroundColor: '#1e40af', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>
-                      View
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:16, fontSize:12, color:'#64748b' }}>
-          <span>{total > 0 ? `Showing ${fromRow}-${toRow} of ${total} records` : 'No records'}</span>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0}
-              style={{ padding: '6px 12px', backgroundColor: page === 0 ? '#e2e8f0' : '#1e40af', color: page === 0 ? '#64748b' : '#fff', border: 'none', borderRadius: 4, cursor: page === 0 ? 'default' : 'pointer', fontSize: 12 }}>
-              Previous
-            </button>
-            <button onClick={() => setPage(page + 1)} disabled={toRow >= total}
-              style={{ padding: '6px 12px', backgroundColor: toRow >= total ? '#e2e8f0' : '#1e40af', color: toRow >= total ? '#64748b' : '#fff', border: 'none', borderRadius: 4, cursor: toRow >= total ? 'default' : 'pointer', fontSize: 12 }}>
-              Next
-            </button>
+                  </tr>
+                ))}
+                {!loading && companies.length === 0 && (
+                  <tr><td colSpan={20} style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>No companies found</td></tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
+
+      {/* Pagination */}
+      <Pagination
+        total={total}
+        page={page}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={(s) => { setPageSize(s); setPage(0) }}
+      />
 
       {/* Add Company Modal */}
       {showModal && (
@@ -257,6 +333,7 @@ export default function CompaniesPage() {
           </div>
         </div>
       )}
+
       {showImport && (
         <ExcelImporter
           importType="companies"

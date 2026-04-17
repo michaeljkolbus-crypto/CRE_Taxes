@@ -4,27 +4,29 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { fmt } from '../../lib/theme'
 import RecordToolbar from '../../components/shared/RecordToolbar'
+import Pagination from '../../components/shared/Pagination'
 import { useViewPreferences } from '../../hooks/useViewPreferences'
+import { useResizableColumns } from '../../hooks/useResizableColumns'
 import { ExcelImporter } from '../../components/shared/ExcelImporter'
 import { hexToRgba } from '../../components/shared/TagInput'
 
-const PAGE_SIZE = 50
+const DEFAULT_PAGE_SIZE = 50
 
 const ALL_COLUMNS = [
-  { key: 'full_name',        label: 'Name',           visible: true  },
-  { key: 'company_name',     label: 'Company',        visible: true  },
-  { key: 'main_phone',       label: 'Phone',          visible: true  },
-  { key: 'email_address',    label: 'Email',          visible: true  },
-  { key: 'contact_type',     label: 'Contact Type',   visible: true  },
-  { key: 'city',             label: 'City',           visible: true  },
-  { key: 'title',            label: 'Title',          visible: false },
-  { key: 'source',           label: 'Source',         visible: false },
-  { key: 'contact_groups',   label: 'Groups',         visible: false },
-  { key: 'segments',         label: 'Segments',       visible: false },
-  { key: 'linkedin_url',     label: 'LinkedIn',       visible: false },
-  { key: 'verified',         label: 'Verified',       visible: false },
-  { key: 'last_modified_by', label: 'Modified By',    visible: false },
-  { key: 'updated_at',       label: 'Last Modified',  visible: false },
+  { key: 'full_name',        label: 'Name',           visible: true,  defaultWidth: 180 },
+  { key: 'company_name',     label: 'Company',        visible: true,  defaultWidth: 160 },
+  { key: 'main_phone',       label: 'Phone',          visible: true,  defaultWidth: 140 },
+  { key: 'email_address',    label: 'Email',          visible: true,  defaultWidth: 190 },
+  { key: 'contact_type',     label: 'Contact Type',   visible: true,  defaultWidth: 130 },
+  { key: 'city',             label: 'City',           visible: true,  defaultWidth: 120 },
+  { key: 'title',            label: 'Title',          visible: false, defaultWidth: 140 },
+  { key: 'source',           label: 'Source',         visible: false, defaultWidth: 120 },
+  { key: 'contact_groups',   label: 'Groups',         visible: false, defaultWidth: 160 },
+  { key: 'segments',         label: 'Segments',       visible: false, defaultWidth: 140 },
+  { key: 'linkedin_url',     label: 'LinkedIn',       visible: false, defaultWidth: 90  },
+  { key: 'verified',         label: 'Verified',       visible: false, defaultWidth: 100 },
+  { key: 'last_modified_by', label: 'Modified By',    visible: false, defaultWidth: 130 },
+  { key: 'updated_at',       label: 'Last Modified',  visible: false, defaultWidth: 130 },
 ]
 
 export default function ContactsPage() {
@@ -33,6 +35,7 @@ export default function ContactsPage() {
   const [contacts, setContacts] = useState([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(false)
   const [showModal, setShowModal] = useState(false)
@@ -46,9 +49,10 @@ export default function ContactsPage() {
   })
 
   const { views, saveView, deleteView } = useViewPreferences('contacts_list')
+  const { widths, startResize, resizeHandleStyle } = useResizableColumns(ALL_COLUMNS)
   const [groupDefs, setGroupDefs] = useState([])
 
-  useEffect(() => { fetchContacts() }, [page, search])
+  useEffect(() => { fetchContacts() }, [page, pageSize, search])
 
   useEffect(() => {
     supabase
@@ -60,8 +64,8 @@ export default function ContactsPage() {
 
   const fetchContacts = async () => {
     setLoading(true)
-    const from = page * PAGE_SIZE
-    const to   = from + PAGE_SIZE - 1
+    const from = page * pageSize
+    const to   = from + pageSize - 1
     let query = supabase.from('contacts').select('*, company:companies(id, company_name)', { count: 'exact' })
     if (search) {
       query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email_address.ilike.%${search}%,main_phone.ilike.%${search}%`)
@@ -141,8 +145,16 @@ export default function ContactsPage() {
   }
 
   const visCol = (key) => columns.find(c => c.key === key)?.visible !== false
-  const fromRow = page * PAGE_SIZE + 1
-  const toRow   = Math.min((page + 1) * PAGE_SIZE, total)
+
+  const thStyle = (key, extra = {}) => ({
+    ...fmt.th,
+    padding: '12px 16px',
+    position: 'relative',
+    width: widths[key],
+    minWidth: 60,
+    userSelect: 'none',
+    ...extra,
+  })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -167,26 +179,83 @@ export default function ContactsPage() {
           onChange={e => { setSearch(e.target.value); setPage(0) }}
           style={{ border:'1px solid #d1d5db', borderRadius:8, padding:'6px 12px', width:280, fontSize:13 }} />
       </div>
-      <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 24px 0' }}>
         <div style={{ backgroundColor: '#fff', borderRadius: 8, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
             <thead style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0 }}>
               <tr>
-                {visCol('full_name')        && <th style={{ ...fmt.th, textAlign: 'left', padding: '12px 16px' }}>Name</th>}
-                {visCol('company_name')     && <th style={{ ...fmt.th, padding: '12px 16px' }}>Company</th>}
-                {visCol('main_phone')       && <th style={{ ...fmt.th, padding: '12px 16px' }}>Phone</th>}
-                {visCol('email_address')    && <th style={{ ...fmt.th, padding: '12px 16px' }}>Email</th>}
-                {visCol('contact_type')     && <th style={{ ...fmt.th, padding: '12px 16px' }}>Contact Type</th>}
-                {visCol('city')             && <th style={{ ...fmt.th, padding: '12px 16px' }}>City</th>}
-                {visCol('title')            && <th style={{ ...fmt.th, padding: '12px 16px' }}>Title</th>}
-                {visCol('source')           && <th style={{ ...fmt.th, padding: '12px 16px' }}>Source</th>}
-                {visCol('contact_groups')   && <th style={{ ...fmt.th, padding: '12px 16px' }}>Groups</th>}
-                {visCol('segments')         && <th style={{ ...fmt.th, padding: '12px 16px' }}>Segments</th>}
-                {visCol('linkedin_url')     && <th style={{ ...fmt.th, padding: '12px 16px' }}>LinkedIn</th>}
-                {visCol('verified')         && <th style={{ ...fmt.th, padding: '12px 16px' }}>Verified</th>}
-                {visCol('last_modified_by') && <th style={{ ...fmt.th, padding: '12px 16px' }}>Modified By</th>}
-                {visCol('updated_at')       && <th style={{ ...fmt.th, padding: '12px 16px' }}>Last Modified</th>}
-                <th style={{ ...fmt.th, padding: '12px 16px' }}>Actions</th>
+                {visCol('full_name') && (
+                  <th style={{ ...thStyle('full_name'), textAlign: 'left' }}>
+                    Name <span style={resizeHandleStyle} onMouseDown={e => startResize('full_name', e)} />
+                  </th>
+                )}
+                {visCol('company_name') && (
+                  <th style={thStyle('company_name')}>
+                    Company <span style={resizeHandleStyle} onMouseDown={e => startResize('company_name', e)} />
+                  </th>
+                )}
+                {visCol('main_phone') && (
+                  <th style={thStyle('main_phone')}>
+                    Phone <span style={resizeHandleStyle} onMouseDown={e => startResize('main_phone', e)} />
+                  </th>
+                )}
+                {visCol('email_address') && (
+                  <th style={thStyle('email_address')}>
+                    Email <span style={resizeHandleStyle} onMouseDown={e => startResize('email_address', e)} />
+                  </th>
+                )}
+                {visCol('contact_type') && (
+                  <th style={thStyle('contact_type')}>
+                    Contact Type <span style={resizeHandleStyle} onMouseDown={e => startResize('contact_type', e)} />
+                  </th>
+                )}
+                {visCol('city') && (
+                  <th style={thStyle('city')}>
+                    City <span style={resizeHandleStyle} onMouseDown={e => startResize('city', e)} />
+                  </th>
+                )}
+                {visCol('title') && (
+                  <th style={thStyle('title')}>
+                    Title <span style={resizeHandleStyle} onMouseDown={e => startResize('title', e)} />
+                  </th>
+                )}
+                {visCol('source') && (
+                  <th style={thStyle('source')}>
+                    Source <span style={resizeHandleStyle} onMouseDown={e => startResize('source', e)} />
+                  </th>
+                )}
+                {visCol('contact_groups') && (
+                  <th style={thStyle('contact_groups')}>
+                    Groups <span style={resizeHandleStyle} onMouseDown={e => startResize('contact_groups', e)} />
+                  </th>
+                )}
+                {visCol('segments') && (
+                  <th style={thStyle('segments')}>
+                    Segments <span style={resizeHandleStyle} onMouseDown={e => startResize('segments', e)} />
+                  </th>
+                )}
+                {visCol('linkedin_url') && (
+                  <th style={thStyle('linkedin_url')}>
+                    LinkedIn <span style={resizeHandleStyle} onMouseDown={e => startResize('linkedin_url', e)} />
+                  </th>
+                )}
+                {visCol('verified') && (
+                  <th style={thStyle('verified')}>
+                    Verified <span style={resizeHandleStyle} onMouseDown={e => startResize('verified', e)} />
+                  </th>
+                )}
+                {visCol('last_modified_by') && (
+                  <th style={thStyle('last_modified_by')}>
+                    Modified By <span style={resizeHandleStyle} onMouseDown={e => startResize('last_modified_by', e)} />
+                  </th>
+                )}
+                {visCol('updated_at') && (
+                  <th style={thStyle('updated_at')}>
+                    Last Modified <span style={resizeHandleStyle} onMouseDown={e => startResize('updated_at', e)} />
+                  </th>
+                )}
+                <th style={{ ...fmt.th, width: 80, padding: '12px 16px' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -252,22 +321,17 @@ export default function ContactsPage() {
               ))}
             </tbody>
           </table>
-        </div>
-
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:16, fontSize:12, color:'#64748b' }}>
-          <span>{total > 0 ? `Showing ${fromRow}-${toRow} of ${total} records` : 'No records'}</span>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0}
-              style={{ padding: '6px 12px', backgroundColor: page === 0 ? '#e2e8f0' : '#1e40af', color: page === 0 ? '#64748b' : '#fff', border: 'none', borderRadius: 4, cursor: page === 0 ? 'default' : 'pointer', fontSize: 12 }}>
-              Previous
-            </button>
-            <button onClick={() => setPage(page + 1)} disabled={toRow >= total}
-              style={{ padding: '6px 12px', backgroundColor: toRow >= total ? '#e2e8f0' : '#1e40af', color: toRow >= total ? '#64748b' : '#fff', border: 'none', borderRadius: 4, cursor: toRow >= total ? 'default' : 'pointer', fontSize: 12 }}>
-              Next
-            </button>
           </div>
         </div>
       </div>
+
+      <Pagination
+        total={total}
+        page={page}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={(s) => { setPageSize(s); setPage(0) }}
+      />
 
       {/* Add Contact Modal */}
       {showModal && (

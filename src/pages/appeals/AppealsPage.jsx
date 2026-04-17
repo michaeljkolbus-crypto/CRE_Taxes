@@ -4,7 +4,9 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { fmt } from '../../lib/theme'
 import RecordToolbar from '../../components/shared/RecordToolbar'
+import Pagination from '../../components/shared/Pagination'
 import { useViewPreferences } from '../../hooks/useViewPreferences'
+import { useResizableColumns } from '../../hooks/useResizableColumns'
 
 function calcFinancials(appeal) {
   const eavPre   = parseFloat(appeal?.eav_pre)  || 0
@@ -24,18 +26,18 @@ function getBORBadge(result) {
 }
 
 const ALL_COLUMNS = [
-  { key: 'address',      label: 'Address',       visible: true  },
-  { key: 'county',       label: 'County',         visible: true  },
-  { key: 'tax_year',     label: 'Tax Year',       visible: true  },
-  { key: 'stage',        label: 'Stage',          visible: true  },
-  { key: 'bor_result',   label: 'BOR Result',     visible: true  },
-  { key: 'ptab_result',  label: 'PTAB Result',    visible: true  },
-  { key: 'eav_reduction',label: 'EAV Reduction',  visible: true  },
-  { key: 'tax_savings',  label: 'Tax Savings',    visible: true  },
-  { key: 'commission',   label: 'Commission',     visible: true  },
-  { key: 'verified',         label: 'Verified',      visible: false },
-  { key: 'last_modified_by', label: 'Modified By',   visible: false },
-  { key: 'updated_at',       label: 'Last Modified', visible: false },
+  { key: 'address',      label: 'Address',       visible: true,  defaultWidth: 200 },
+  { key: 'county',       label: 'County',         visible: true,  defaultWidth: 110 },
+  { key: 'tax_year',     label: 'Tax Year',       visible: true,  defaultWidth: 90  },
+  { key: 'stage',        label: 'Stage',          visible: true,  defaultWidth: 130 },
+  { key: 'bor_result',   label: 'BOR Result',     visible: true,  defaultWidth: 110 },
+  { key: 'ptab_result',  label: 'PTAB Result',    visible: true,  defaultWidth: 110 },
+  { key: 'eav_reduction',label: 'EAV Reduction',  visible: true,  defaultWidth: 120 },
+  { key: 'tax_savings',  label: 'Tax Savings',    visible: true,  defaultWidth: 110 },
+  { key: 'commission',   label: 'Commission',     visible: true,  defaultWidth: 110 },
+  { key: 'verified',         label: 'Verified',      visible: false, defaultWidth: 100 },
+  { key: 'last_modified_by', label: 'Modified By',   visible: false, defaultWidth: 130 },
+  { key: 'updated_at',       label: 'Last Modified', visible: false, defaultWidth: 130 },
 ]
 
 export default function AppealsPage() {
@@ -46,7 +48,8 @@ export default function AppealsPage() {
   const [stages, setStages] = useState([])
   const [loading, setLoading] = useState(true)
   const [count, setCount] = useState(0)
-  const [pagination, setPagination] = useState({ page: 1, pageSize: 20 })
+  const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(50)
   const [searchText, setSearchText] = useState('')
   const [selectedStage, setSelectedStage] = useState('all')
   const [selectedYear, setSelectedYear] = useState('')
@@ -54,8 +57,9 @@ export default function AppealsPage() {
   const [activeViewId, setActiveViewId] = useState(null)
 
   const { views, saveView, deleteView } = useViewPreferences('appeals_list')
+  const { widths, startResize, resizeHandleStyle } = useResizableColumns(ALL_COLUMNS)
 
-  useEffect(() => { fetchStages(); fetchAppeals() }, [selectedStage, selectedYear, pagination.page])
+  useEffect(() => { fetchStages(); fetchAppeals() }, [selectedStage, selectedYear, page, pageSize])
 
   const fetchStages = async () => {
     const { data } = await supabase.from('appeal_stages').select('*').order('sort_order', { ascending: true })
@@ -71,8 +75,8 @@ export default function AppealsPage() {
     if (selectedStage !== 'all') query = query.eq('stage_id', selectedStage)
     if (selectedYear) query = query.eq('tax_year', parseInt(selectedYear))
 
-    const from = (pagination.page - 1) * pagination.pageSize
-    const to   = from + pagination.pageSize - 1
+    const from = page * pageSize
+    const to   = from + pageSize - 1
     const { data, count: totalCount, error } = await query.order('created_at', { ascending: false }).range(from, to)
 
     if (error) console.error(error)
@@ -125,6 +129,13 @@ export default function AppealsPage() {
 
   const visCol = (key) => columns.find(c => c.key === key)?.visible !== false
 
+  const thStyle = (key, extra = {}) => ({
+    padding: 12, fontWeight: 600, color: '#1e293b',
+    position: 'relative', userSelect: 'none',
+    width: widths[key], minWidth: 60,
+    ...extra,
+  })
+
   const stageBadge = (stage) => (
     <div style={{ display: 'inline-block', background: stage?.color || '#e2e8f0', color: '#fff', padding: '4px 8px', borderRadius: 4, fontSize: 12, fontWeight: 500 }}>
       {stage?.name}
@@ -138,6 +149,33 @@ export default function AppealsPage() {
         {result || '—'}
       </div>
     )
+  }
+
+  function handleExport() {
+    const visibleCols = ALL_COLUMNS.filter(c => visCol(c.key))
+    const header = visibleCols.map(c => c.label).join(',')
+    const rows = appeals.map(appeal => {
+      const fin = calcFinancials(appeal)
+      return visibleCols.map(col => {
+        switch(col.key) {
+          case 'address':       return appeal.property?.address || ''
+          case 'county':        return appeal.property?.county || ''
+          case 'tax_year':      return appeal.tax_year || ''
+          case 'stage':         return appeal.stage?.name || ''
+          case 'bor_result':    return appeal.bor_result || ''
+          case 'ptab_result':   return appeal.ptab_result || ''
+          case 'eav_reduction': return fin.eavReduction
+          case 'tax_savings':   return fin.totalTaxSavings
+          case 'commission':    return fin.commissionAmount
+          default:              return appeal[col.key] ?? ''
+        }
+      }).join(',')
+    })
+    const csv  = [header, ...rows].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a'); a.href = url; a.download = 'appeals.csv'; a.click()
+    URL.revokeObjectURL(url)
   }
 
   if (view === 'pipeline') {
@@ -181,8 +219,6 @@ export default function AppealsPage() {
     )
   }
 
-  const totalPages = Math.ceil(count / pagination.pageSize)
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <RecordToolbar
@@ -190,6 +226,7 @@ export default function AppealsPage() {
         count={count}
         addLabel="Pipeline View"
         onAdd={() => setView('pipeline')}
+        onExport={handleExport}
         columns={columns}
         onColumnsChange={handleColumnsChange}
         savedViews={views}
@@ -203,33 +240,82 @@ export default function AppealsPage() {
         <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 16, marginBottom: 20, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
           <input type="text" placeholder="Search address or parcel ID" value={searchText} onChange={e => setSearchText(e.target.value)}
             style={{ padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: 14, fontFamily: 'inherit' }} />
-          <select value={selectedStage} onChange={e => { setSelectedStage(e.target.value); setPagination({ ...pagination, page: 1 }) }}
+          <select value={selectedStage} onChange={e => { setSelectedStage(e.target.value); setPage(0) }}
             style={{ padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: 14, fontFamily: 'inherit' }}>
             <option value="all">All Stages</option>
             {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
-          <input type="text" placeholder="Tax Year" value={selectedYear} onChange={e => { setSelectedYear(e.target.value); setPagination({ ...pagination, page: 1 }) }}
+          <input type="text" placeholder="Tax Year" value={selectedYear} onChange={e => { setSelectedYear(e.target.value); setPage(0) }}
             style={{ padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: 14, fontFamily: 'inherit' }} />
         </div>
 
         {/* Table */}
         <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+          <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, tableLayout: 'fixed' }}>
             <thead>
               <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                {visCol('address')       && <th style={{ padding: 12, textAlign: 'left',   fontWeight: 600, color: '#1e293b' }}>Address</th>}
-                {visCol('county')        && <th style={{ padding: 12, textAlign: 'center', fontWeight: 600, color: '#1e293b' }}>County</th>}
-                {visCol('tax_year')      && <th style={{ padding: 12, textAlign: 'center', fontWeight: 600, color: '#1e293b' }}>Tax Year</th>}
-                {visCol('stage')         && <th style={{ padding: 12, textAlign: 'center', fontWeight: 600, color: '#1e293b' }}>Stage</th>}
-                {visCol('bor_result')    && <th style={{ padding: 12, textAlign: 'center', fontWeight: 600, color: '#1e293b' }}>BOR Result</th>}
-                {visCol('ptab_result')   && <th style={{ padding: 12, textAlign: 'center', fontWeight: 600, color: '#1e293b' }}>PTAB Result</th>}
-                {visCol('eav_reduction') && <th style={{ padding: 12, textAlign: 'center', fontWeight: 600, color: '#1e293b' }}>EAV Reduction</th>}
-                {visCol('tax_savings')   && <th style={{ padding: 12, textAlign: 'center', fontWeight: 600, color: '#1e293b' }}>Tax Savings</th>}
-                {visCol('commission')    && <th style={{ padding: 12, textAlign: 'center', fontWeight: 600, color: '#1e293b' }}>Commission</th>}
-                {visCol('verified')         && <th style={{ padding: 12, textAlign: 'center', fontWeight: 600, color: '#1e293b' }}>Verified</th>}
-                {visCol('last_modified_by') && <th style={{ padding: 12, textAlign: 'center', fontWeight: 600, color: '#1e293b' }}>Modified By</th>}
-                {visCol('updated_at')       && <th style={{ padding: 12, textAlign: 'center', fontWeight: 600, color: '#1e293b' }}>Last Modified</th>}
-                <th style={{ padding: 12, textAlign: 'center', fontWeight: 600, color: '#1e293b' }}>Actions</th>
+                {visCol('address') && (
+                  <th style={{ ...thStyle('address'), textAlign: 'left' }}>
+                    Address <span style={resizeHandleStyle} onMouseDown={e => startResize('address', e)} />
+                  </th>
+                )}
+                {visCol('county') && (
+                  <th style={{ ...thStyle('county'), textAlign: 'center' }}>
+                    County <span style={resizeHandleStyle} onMouseDown={e => startResize('county', e)} />
+                  </th>
+                )}
+                {visCol('tax_year') && (
+                  <th style={{ ...thStyle('tax_year'), textAlign: 'center' }}>
+                    Tax Year <span style={resizeHandleStyle} onMouseDown={e => startResize('tax_year', e)} />
+                  </th>
+                )}
+                {visCol('stage') && (
+                  <th style={{ ...thStyle('stage'), textAlign: 'center' }}>
+                    Stage <span style={resizeHandleStyle} onMouseDown={e => startResize('stage', e)} />
+                  </th>
+                )}
+                {visCol('bor_result') && (
+                  <th style={{ ...thStyle('bor_result'), textAlign: 'center' }}>
+                    BOR Result <span style={resizeHandleStyle} onMouseDown={e => startResize('bor_result', e)} />
+                  </th>
+                )}
+                {visCol('ptab_result') && (
+                  <th style={{ ...thStyle('ptab_result'), textAlign: 'center' }}>
+                    PTAB Result <span style={resizeHandleStyle} onMouseDown={e => startResize('ptab_result', e)} />
+                  </th>
+                )}
+                {visCol('eav_reduction') && (
+                  <th style={{ ...thStyle('eav_reduction'), textAlign: 'center' }}>
+                    EAV Reduction <span style={resizeHandleStyle} onMouseDown={e => startResize('eav_reduction', e)} />
+                  </th>
+                )}
+                {visCol('tax_savings') && (
+                  <th style={{ ...thStyle('tax_savings'), textAlign: 'center' }}>
+                    Tax Savings <span style={resizeHandleStyle} onMouseDown={e => startResize('tax_savings', e)} />
+                  </th>
+                )}
+                {visCol('commission') && (
+                  <th style={{ ...thStyle('commission'), textAlign: 'center' }}>
+                    Commission <span style={resizeHandleStyle} onMouseDown={e => startResize('commission', e)} />
+                  </th>
+                )}
+                {visCol('verified') && (
+                  <th style={{ ...thStyle('verified'), textAlign: 'center' }}>
+                    Verified <span style={resizeHandleStyle} onMouseDown={e => startResize('verified', e)} />
+                  </th>
+                )}
+                {visCol('last_modified_by') && (
+                  <th style={{ ...thStyle('last_modified_by'), textAlign: 'center' }}>
+                    Modified By <span style={resizeHandleStyle} onMouseDown={e => startResize('last_modified_by', e)} />
+                  </th>
+                )}
+                {visCol('updated_at') && (
+                  <th style={{ ...thStyle('updated_at'), textAlign: 'center' }}>
+                    Last Modified <span style={resizeHandleStyle} onMouseDown={e => startResize('updated_at', e)} />
+                  </th>
+                )}
+                <th style={{ padding: 12, textAlign: 'center', fontWeight: 600, color: '#1e293b', width: 80 }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -281,23 +367,17 @@ export default function AppealsPage() {
               )}
             </tbody>
           </table>
-        </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div style={{ marginTop: 20, display: 'flex', justifyContent: 'center', gap: 8, alignItems: 'center' }}>
-            <button disabled={pagination.page === 1} onClick={() => setPagination({ ...pagination, page: pagination.page - 1 })}
-              style={{ padding: '6px 12px', background: pagination.page === 1 ? '#e2e8f0' : '#1e40af', color: '#fff', border: 'none', borderRadius: 4, cursor: pagination.page === 1 ? 'not-allowed' : 'pointer', fontSize: 12 }}>
-              Previous
-            </button>
-            <span style={{ color: '#64748b', fontSize: 12 }}>Page {pagination.page} of {totalPages}</span>
-            <button disabled={pagination.page === totalPages} onClick={() => setPagination({ ...pagination, page: pagination.page + 1 })}
-              style={{ padding: '6px 12px', background: pagination.page === totalPages ? '#e2e8f0' : '#1e40af', color: '#fff', border: 'none', borderRadius: 4, cursor: pagination.page === totalPages ? 'not-allowed' : 'pointer', fontSize: 12 }}>
-              Next
-            </button>
           </div>
-        )}
+        </div>
       </div>
+
+      <Pagination
+        total={count}
+        page={page}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={(s) => { setPageSize(s); setPage(0) }}
+      />
     </div>
   )
 }

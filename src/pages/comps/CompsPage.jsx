@@ -3,21 +3,23 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import { fmt, COUNTIES, PROPERTY_TYPES } from '../../lib/theme'
 import RecordToolbar from '../../components/shared/RecordToolbar'
+import Pagination from '../../components/shared/Pagination'
 import { useViewPreferences } from '../../hooks/useViewPreferences'
+import { useResizableColumns } from '../../hooks/useResizableColumns'
 import { ExcelImporter } from '../../components/shared/ExcelImporter'
 
 const COMPS_COLUMNS = [
-  { key: 'address',              label: 'Address',       visible: true  },
-  { key: 'county',               label: 'County',        visible: true  },
-  { key: 'sale_date',            label: 'Sale Date',     visible: true  },
-  { key: 'sales_price',          label: 'Sale Price',    visible: true  },
-  { key: 'total_building_sqft',  label: 'Bldg SF',       visible: true  },
-  { key: 'sales_price_per_sqft', label: 'Sale$/SF',      visible: true  },
-  { key: 'property_type',        label: 'Prop Type',     visible: true  },
-  { key: 'data_source',          label: 'Data Source',   visible: true  },
-  { key: 'verified',             label: 'Verified',      visible: true  },
-  { key: 'last_modified_by',     label: 'Modified By',   visible: false },
-  { key: 'updated_at',           label: 'Last Modified', visible: false },
+  { key: 'address',              label: 'Address',       visible: true,  defaultWidth: 200 },
+  { key: 'county',               label: 'County',        visible: true,  defaultWidth: 110 },
+  { key: 'sale_date',            label: 'Sale Date',     visible: true,  defaultWidth: 100 },
+  { key: 'sales_price',          label: 'Sale Price',    visible: true,  defaultWidth: 110 },
+  { key: 'total_building_sqft',  label: 'Bldg SF',       visible: true,  defaultWidth: 90  },
+  { key: 'sales_price_per_sqft', label: 'Sale$/SF',      visible: true,  defaultWidth: 90  },
+  { key: 'property_type',        label: 'Prop Type',     visible: true,  defaultWidth: 110 },
+  { key: 'data_source',          label: 'Data Source',   visible: true,  defaultWidth: 110 },
+  { key: 'verified',             label: 'Verified',      visible: true,  defaultWidth: 90  },
+  { key: 'last_modified_by',     label: 'Modified By',   visible: false, defaultWidth: 130 },
+  { key: 'updated_at',           label: 'Last Modified', visible: false, defaultWidth: 130 },
 ]
 
 const MASS_REPLACE_FIELDS = [
@@ -35,6 +37,7 @@ export default function CompsPage() {
   const [county, setCounty] = useState('All')
   const [propType, setPropType] = useState('All')
   const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(50)
   const [total, setTotal] = useState(0)
   const [expandedId, setExpandedId] = useState(null)
   const [showAddModal, setShowAddModal] = useState(false)
@@ -43,9 +46,9 @@ export default function CompsPage() {
   const [selectedIds, setSelectedIds] = useState([])
   const [importResult, setImportResult] = useState(null)
   const [activeViewId, setActiveViewId] = useState(null)
-  const pageSize = 50
 
   const { views, saveView, deleteView } = useViewPreferences('comps_list')
+  const { widths, startResize, resizeHandleStyle } = useResizableColumns(COMPS_COLUMNS)
 
   const handleLoadView = (viewId, config) => {
     const savedCols = config?.columns || []
@@ -141,7 +144,6 @@ export default function CompsPage() {
   }
 
   const visCol = (key) => columns.find(c => c.key === key)?.visible !== false
-  const pageCount = Math.ceil(total / pageSize)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -193,26 +195,70 @@ export default function CompsPage() {
       </div>
 
       {/* Table */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 24px 0' }}>
         <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: 10, background: '#fff' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
-                <th style={thStyle({ w: 36 })}>
+                <th style={{ ...thStyle({ w: 36 }), position: 'relative' }}>
                   <input type="checkbox" checked={selectedIds.length === comps.length && comps.length > 0} onChange={toggleSelectAll} style={{ cursor:'pointer', accentColor:'#1e40af' }} />
                 </th>
-                {visCol('address') && <th style={thStyle({ align: 'left' })}>Address</th>}
-                {visCol('county') && <th style={thStyle()}>County</th>}
-                {visCol('sale_date') && <th style={thStyle()}>Sale Date</th>}
-                {visCol('sales_price') && <th style={thStyle()}>Sale Price</th>}
-                {visCol('total_building_sqft') && <th style={thStyle()}>Bldg SF</th>}
-                {visCol('sales_price_per_sqft') && <th style={thStyle()}>Sale$/SF</th>}
-                {visCol('property_type') && <th style={thStyle()}>Prop Type</th>}
-                {visCol('data_source') && <th style={thStyle()}>Source</th>}
-                {visCol('verified')         && <th style={thStyle()}>Verified</th>}
-                {visCol('last_modified_by') && <th style={thStyle()}>Modified By</th>}
-                {visCol('updated_at')       && <th style={thStyle()}>Last Modified</th>}
-                <th style={thStyle()}>Actions</th>
+                {visCol('address') && (
+                  <th style={{ ...thStyle({ align: 'left' }), position: 'relative', width: widths['address'] }}>
+                    Address <span style={resizeHandleStyle} onMouseDown={e => startResize('address', e)} />
+                  </th>
+                )}
+                {visCol('county') && (
+                  <th style={{ ...thStyle(), position: 'relative', width: widths['county'] }}>
+                    County <span style={resizeHandleStyle} onMouseDown={e => startResize('county', e)} />
+                  </th>
+                )}
+                {visCol('sale_date') && (
+                  <th style={{ ...thStyle(), position: 'relative', width: widths['sale_date'] }}>
+                    Sale Date <span style={resizeHandleStyle} onMouseDown={e => startResize('sale_date', e)} />
+                  </th>
+                )}
+                {visCol('sales_price') && (
+                  <th style={{ ...thStyle(), position: 'relative', width: widths['sales_price'] }}>
+                    Sale Price <span style={resizeHandleStyle} onMouseDown={e => startResize('sales_price', e)} />
+                  </th>
+                )}
+                {visCol('total_building_sqft') && (
+                  <th style={{ ...thStyle(), position: 'relative', width: widths['total_building_sqft'] }}>
+                    Bldg SF <span style={resizeHandleStyle} onMouseDown={e => startResize('total_building_sqft', e)} />
+                  </th>
+                )}
+                {visCol('sales_price_per_sqft') && (
+                  <th style={{ ...thStyle(), position: 'relative', width: widths['sales_price_per_sqft'] }}>
+                    Sale$/SF <span style={resizeHandleStyle} onMouseDown={e => startResize('sales_price_per_sqft', e)} />
+                  </th>
+                )}
+                {visCol('property_type') && (
+                  <th style={{ ...thStyle(), position: 'relative', width: widths['property_type'] }}>
+                    Prop Type <span style={resizeHandleStyle} onMouseDown={e => startResize('property_type', e)} />
+                  </th>
+                )}
+                {visCol('data_source') && (
+                  <th style={{ ...thStyle(), position: 'relative', width: widths['data_source'] }}>
+                    Source <span style={resizeHandleStyle} onMouseDown={e => startResize('data_source', e)} />
+                  </th>
+                )}
+                {visCol('verified') && (
+                  <th style={{ ...thStyle(), position: 'relative', width: widths['verified'] }}>
+                    Verified <span style={resizeHandleStyle} onMouseDown={e => startResize('verified', e)} />
+                  </th>
+                )}
+                {visCol('last_modified_by') && (
+                  <th style={{ ...thStyle(), position: 'relative', width: widths['last_modified_by'] }}>
+                    Modified By <span style={resizeHandleStyle} onMouseDown={e => startResize('last_modified_by', e)} />
+                  </th>
+                )}
+                {visCol('updated_at') && (
+                  <th style={{ ...thStyle(), position: 'relative', width: widths['updated_at'] }}>
+                    Last Modified <span style={resizeHandleStyle} onMouseDown={e => startResize('updated_at', e)} />
+                  </th>
+                )}
+                <th style={{ ...thStyle(), width: 80 }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -301,17 +347,15 @@ export default function CompsPage() {
           </table>
         </div>
 
-        {/* Pagination */}
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:16 }}>
-          <p style={{ margin:0, fontSize:12, color:'#64748b' }}>
-            Showing {page*pageSize+1}–{Math.min((page+1)*pageSize, total)} of {total}
-          </p>
-          <div style={{ display:'flex', gap:8 }}>
-            <button onClick={() => setPage(p=>p-1)} disabled={page===0} style={{ padding:'7px 16px', border:'1px solid #e2e8f0', borderRadius:8, background:'#fff', color:'#1e293b', fontSize:13, fontWeight:600, cursor:page===0?'not-allowed':'pointer', opacity:page===0?0.5:1 }}>Previous</button>
-            <button onClick={() => setPage(p=>p+1)} disabled={page>=pageCount-1} style={{ padding:'7px 16px', border:'1px solid #e2e8f0', borderRadius:8, background:'#fff', color:'#1e293b', fontSize:13, fontWeight:600, cursor:page>=pageCount-1?'not-allowed':'pointer', opacity:page>=pageCount-1?0.5:1 }}>Next</button>
-          </div>
-        </div>
       </div>
+
+      <Pagination
+        total={total}
+        page={page}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={(s) => { setPageSize(s); setPage(0) }}
+      />
 
       {showAddModal && <AddCompModal onClose={() => setShowAddModal(false)} onAdd={addComp} />}
       {showImportModal && (
