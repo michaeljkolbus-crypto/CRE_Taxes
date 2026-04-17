@@ -49,6 +49,16 @@ export default function CompsPage() {
 
   const { views, saveView, deleteView } = useViewPreferences('comps_list')
   const { widths, startResize, resizeHandleStyle } = useResizableColumns(COMPS_COLUMNS)
+  const [sortField, setSortField] = useState('sale_date')
+  const [sortAsc, setSortAsc] = useState(false)
+
+  const handleSort = (field) => {
+    if (sortField === field) setSortAsc(prev => !prev)
+    else { setSortField(field); setSortAsc(true) }
+    setPage(0)
+  }
+
+  const sortInd = (field) => sortField === field ? (sortAsc ? ' ↑' : ' ↓') : ''
 
   const handleLoadView = (viewId, config) => {
     const savedCols = config?.columns || []
@@ -77,7 +87,7 @@ export default function CompsPage() {
 
   const handleColumnsChange = (newCols) => { setColumns(newCols); setActiveViewId(null) }
 
-  useEffect(() => { fetchComps() }, [search, county, propType, page])
+  useEffect(() => { fetchComps() }, [search, county, propType, page, sortField, sortAsc])
 
   async function fetchComps() {
     setLoading(true)
@@ -86,7 +96,7 @@ export default function CompsPage() {
     if (county !== 'All') query = query.eq('county', county)
     if (propType !== 'All') query = query.eq('property_type', propType)
     const from = page * pageSize
-    query = query.order('sale_date', { ascending: false }).range(from, from + pageSize - 1)
+    query = query.order(sortField, { ascending: sortAsc }).range(from, from + pageSize - 1)
     const { data, count, error } = await query
     if (error) console.error(error)
     else { setComps(data || []); setTotal(count || 0) }
@@ -200,65 +210,65 @@ export default function CompsPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
-                <th style={{ ...thStyle({ w: 36 }), position: 'relative' }}>
+                <th style={{ ...thStyle({ w: 36, noSort: true }), position: 'relative' }}>
                   <input type="checkbox" checked={selectedIds.length === comps.length && comps.length > 0} onChange={toggleSelectAll} style={{ cursor:'pointer', accentColor:'#1e40af' }} />
                 </th>
                 {visCol('address') && (
-                  <th style={{ ...thStyle({ align: 'left' }), position: 'relative', width: widths['address'] }}>
-                    Address <span style={resizeHandleStyle} onMouseDown={e => startResize('address', e)} />
+                  <th style={{ ...thStyle({ align: 'left' }), position: 'relative', width: widths['address'] }} onClick={() => handleSort('address')}>
+                    Address{sortInd('address')} <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('address', e) }} onClick={e => e.stopPropagation()} />
                   </th>
                 )}
                 {visCol('county') && (
-                  <th style={{ ...thStyle(), position: 'relative', width: widths['county'] }}>
-                    County <span style={resizeHandleStyle} onMouseDown={e => startResize('county', e)} />
+                  <th style={{ ...thStyle(), position: 'relative', width: widths['county'] }} onClick={() => handleSort('county')}>
+                    County{sortInd('county')} <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('county', e) }} onClick={e => e.stopPropagation()} />
                   </th>
                 )}
                 {visCol('sale_date') && (
-                  <th style={{ ...thStyle(), position: 'relative', width: widths['sale_date'] }}>
-                    Sale Date <span style={resizeHandleStyle} onMouseDown={e => startResize('sale_date', e)} />
+                  <th style={{ ...thStyle(), position: 'relative', width: widths['sale_date'] }} onClick={() => handleSort('sale_date')}>
+                    Sale Date{sortInd('sale_date')} <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('sale_date', e) }} onClick={e => e.stopPropagation()} />
                   </th>
                 )}
                 {visCol('sales_price') && (
-                  <th style={{ ...thStyle(), position: 'relative', width: widths['sales_price'] }}>
-                    Sale Price <span style={resizeHandleStyle} onMouseDown={e => startResize('sales_price', e)} />
+                  <th style={{ ...thStyle(), position: 'relative', width: widths['sales_price'] }} onClick={() => handleSort('sales_price')}>
+                    Sale Price{sortInd('sales_price')} <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('sales_price', e) }} onClick={e => e.stopPropagation()} />
                   </th>
                 )}
                 {visCol('total_building_sqft') && (
-                  <th style={{ ...thStyle(), position: 'relative', width: widths['total_building_sqft'] }}>
-                    Bldg SF <span style={resizeHandleStyle} onMouseDown={e => startResize('total_building_sqft', e)} />
+                  <th style={{ ...thStyle(), position: 'relative', width: widths['total_building_sqft'] }} onClick={() => handleSort('total_building_sqft')}>
+                    Bldg SF{sortInd('total_building_sqft')} <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('total_building_sqft', e) }} onClick={e => e.stopPropagation()} />
                   </th>
                 )}
                 {visCol('sales_price_per_sqft') && (
-                  <th style={{ ...thStyle(), position: 'relative', width: widths['sales_price_per_sqft'] }}>
-                    Sale$/SF <span style={resizeHandleStyle} onMouseDown={e => startResize('sales_price_per_sqft', e)} />
+                  <th style={{ ...thStyle(), position: 'relative', width: widths['sales_price_per_sqft'] }} onClick={() => handleSort('sales_price_per_sqft')}>
+                    Sale$/SF{sortInd('sales_price_per_sqft')} <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('sales_price_per_sqft', e) }} onClick={e => e.stopPropagation()} />
                   </th>
                 )}
                 {visCol('property_type') && (
-                  <th style={{ ...thStyle(), position: 'relative', width: widths['property_type'] }}>
-                    Prop Type <span style={resizeHandleStyle} onMouseDown={e => startResize('property_type', e)} />
+                  <th style={{ ...thStyle(), position: 'relative', width: widths['property_type'] }} onClick={() => handleSort('property_type')}>
+                    Prop Type{sortInd('property_type')} <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('property_type', e) }} onClick={e => e.stopPropagation()} />
                   </th>
                 )}
                 {visCol('data_source') && (
-                  <th style={{ ...thStyle(), position: 'relative', width: widths['data_source'] }}>
-                    Source <span style={resizeHandleStyle} onMouseDown={e => startResize('data_source', e)} />
+                  <th style={{ ...thStyle(), position: 'relative', width: widths['data_source'] }} onClick={() => handleSort('data_source')}>
+                    Source{sortInd('data_source')} <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('data_source', e) }} onClick={e => e.stopPropagation()} />
                   </th>
                 )}
                 {visCol('verified') && (
-                  <th style={{ ...thStyle(), position: 'relative', width: widths['verified'] }}>
-                    Verified <span style={resizeHandleStyle} onMouseDown={e => startResize('verified', e)} />
+                  <th style={{ ...thStyle(), position: 'relative', width: widths['verified'] }} onClick={() => handleSort('verified')}>
+                    Verified{sortInd('verified')} <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('verified', e) }} onClick={e => e.stopPropagation()} />
                   </th>
                 )}
                 {visCol('last_modified_by') && (
-                  <th style={{ ...thStyle(), position: 'relative', width: widths['last_modified_by'] }}>
-                    Modified By <span style={resizeHandleStyle} onMouseDown={e => startResize('last_modified_by', e)} />
+                  <th style={{ ...thStyle(), position: 'relative', width: widths['last_modified_by'] }} onClick={() => handleSort('last_modified_by')}>
+                    Modified By{sortInd('last_modified_by')} <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('last_modified_by', e) }} onClick={e => e.stopPropagation()} />
                   </th>
                 )}
                 {visCol('updated_at') && (
-                  <th style={{ ...thStyle(), position: 'relative', width: widths['updated_at'] }}>
-                    Last Modified <span style={resizeHandleStyle} onMouseDown={e => startResize('updated_at', e)} />
+                  <th style={{ ...thStyle(), position: 'relative', width: widths['updated_at'] }} onClick={() => handleSort('updated_at')}>
+                    Last Modified{sortInd('updated_at')} <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('updated_at', e) }} onClick={e => e.stopPropagation()} />
                   </th>
                 )}
-                <th style={{ ...thStyle(), width: 80 }}>Actions</th>
+                <th style={{ ...thStyle({ noSort: true }), width: 80 }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -370,13 +380,14 @@ export default function CompsPage() {
   )
 }
 
-function thStyle({ align, w } = {}) {
+function thStyle({ align, w, noSort } = {}) {
   return {
     padding: '10px 12px', textAlign: align || 'center',
     fontSize: 12, fontWeight: 600, color: '#64748b',
     textTransform: 'uppercase', letterSpacing: '0.05em',
     backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0',
     userSelect: 'none', whiteSpace: 'nowrap',
+    cursor: noSort ? 'default' : 'pointer',
     ...(w ? { width: w } : {})
   }
 }

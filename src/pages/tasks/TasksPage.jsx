@@ -10,22 +10,31 @@ export default function TasksPage() {
   const [showAll, setShowAll] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
   const [properties, setProperties] = useState([])
+  const [sortField, setSortField] = useState('due_date')
+  const [sortAsc, setSortAsc] = useState(true)
+
+  const handleSort = (field) => {
+    if (sortField === field) setSortAsc(prev => !prev)
+    else { setSortField(field); setSortAsc(true) }
+  }
+
+  const sortInd = (field) => sortField === field ? (sortAsc ? ' ↑' : ' ↓') : ''
 
   useEffect(() => {
     fetchTasks()
     fetchProperties()
-  }, [showAll])
+  }, [showAll, sortField, sortAsc])
 
   async function fetchTasks() {
     setLoading(true)
     let query = supabase.from('tasks').select('*, property:properties(id, address, city)')
-    
+
     if (!showAll) {
       query = query.eq('completed', false)
     }
-    
-    query = query.order('due_date', { ascending: true })
-    
+
+    query = query.order(sortField, { ascending: sortAsc })
+
     const { data, error } = await query
     if (error) console.error(error)
     else setTasks(data || [])
@@ -127,11 +136,11 @@ export default function TasksPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#f1f5f9' }}>
-                <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#1e293b' }}>Title</th>
-                <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#1e293b' }}>Due Date</th>
+                <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: sortField === 'title' ? '#1e40af' : '#1e293b', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('title')}>Title{sortInd('title')}</th>
+                <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: sortField === 'due_date' ? '#1e40af' : '#1e293b', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('due_date')}>Due Date{sortInd('due_date')}</th>
                 <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#1e293b' }}>Linked To</th>
-                <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#1e293b' }}>Created</th>
-                <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600', color: '#1e293b' }}>Status</th>
+                <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: sortField === 'created_at' ? '#1e40af' : '#1e293b', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('created_at')}>Created{sortInd('created_at')}</th>
+                <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600', color: sortField === 'completed' ? '#1e40af' : '#1e293b', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('completed')}>Status{sortInd('completed')}</th>
                 <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600', color: '#1e293b' }}></th>
               </tr>
             </thead>

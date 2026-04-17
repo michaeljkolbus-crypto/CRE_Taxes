@@ -42,8 +42,16 @@ export default function CompaniesPage() {
 
   const { views, saveView, deleteView } = useViewPreferences('companies_list')
   const { widths, startResize, resizeHandleStyle } = useResizableColumns(ALL_COLUMNS)
+  const [sortField, setSortField] = useState('company_name')
+  const [sortAsc, setSortAsc] = useState(true)
 
-  useEffect(() => { fetchCompanies() }, [page, pageSize, search])
+  const handleSort = (field) => {
+    if (sortField === field) setSortAsc(prev => !prev)
+    else { setSortField(field); setSortAsc(true) }
+    setPage(0)
+  }
+
+  useEffect(() => { fetchCompanies() }, [page, pageSize, search, sortField, sortAsc])
 
   const fetchCompanies = async () => {
     setLoading(true)
@@ -51,7 +59,7 @@ export default function CompaniesPage() {
     const to   = from + pageSize - 1
     let query = supabase.from('companies').select('*', { count: 'exact' })
     if (search) query = query.or(`company_name.ilike.%${search}%,city.ilike.%${search}%`)
-    query = query.order('company_name', { ascending: true }).range(from, to)
+    query = query.order(sortField, { ascending: sortAsc }).range(from, to)
     const { data, count, error } = await query
     if (error) { console.error(error); setLoading(false); return }
     setCompanies(data || []); setTotal(count || 0); setLoading(false)
@@ -137,7 +145,10 @@ export default function CompaniesPage() {
     width: widths[key],
     minWidth: 60,
     userSelect: 'none',
+    cursor: 'pointer',
   })
+
+  const sortInd = (field) => sortField === field ? (sortAsc ? ' ↑' : ' ↓') : ''
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -173,7 +184,7 @@ export default function CompaniesPage() {
               <thead style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0 }}>
                 <tr>
                   {/* Checkbox */}
-                  <th style={{ ...fmt.th, width: 40, padding: '12px 8px', textAlign: 'center' }}>
+                  <th style={{ ...fmt.th, width: 40, padding: '12px 8px', textAlign: 'center', cursor: 'default' }}>
                     <input type="checkbox"
                       checked={companies.length > 0 && selectedIds.length === companies.length}
                       onChange={toggleSelectAll}
@@ -181,54 +192,54 @@ export default function CompaniesPage() {
                     />
                   </th>
                   {visCol('company_name') && (
-                    <th style={{ ...thStyle('company_name'), textAlign: 'left' }}>
-                      Company Name
-                      <span style={resizeHandleStyle} onMouseDown={e => startResize('company_name', e)} />
+                    <th style={{ ...thStyle('company_name'), textAlign: 'left' }} onClick={() => handleSort('company_name')}>
+                      Company Name{sortInd('company_name')}
+                      <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('company_name', e) }} onClick={e => e.stopPropagation()} />
                     </th>
                   )}
                   {visCol('company_type') && (
-                    <th style={thStyle('company_type')}>
-                      Type
-                      <span style={resizeHandleStyle} onMouseDown={e => startResize('company_type', e)} />
+                    <th style={thStyle('company_type')} onClick={() => handleSort('company_type')}>
+                      Type{sortInd('company_type')}
+                      <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('company_type', e) }} onClick={e => e.stopPropagation()} />
                     </th>
                   )}
                   {visCol('company_phone') && (
-                    <th style={thStyle('company_phone')}>
-                      Phone
-                      <span style={resizeHandleStyle} onMouseDown={e => startResize('company_phone', e)} />
+                    <th style={thStyle('company_phone')} onClick={() => handleSort('company_phone')}>
+                      Phone{sortInd('company_phone')}
+                      <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('company_phone', e) }} onClick={e => e.stopPropagation()} />
                     </th>
                   )}
                   {visCol('city') && (
-                    <th style={thStyle('city')}>
-                      City
-                      <span style={resizeHandleStyle} onMouseDown={e => startResize('city', e)} />
+                    <th style={thStyle('city')} onClick={() => handleSort('city')}>
+                      City{sortInd('city')}
+                      <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('city', e) }} onClick={e => e.stopPropagation()} />
                     </th>
                   )}
                   {visCol('company_website') && (
-                    <th style={thStyle('company_website')}>
-                      Website
-                      <span style={resizeHandleStyle} onMouseDown={e => startResize('company_website', e)} />
+                    <th style={thStyle('company_website')} onClick={() => handleSort('company_website')}>
+                      Website{sortInd('company_website')}
+                      <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('company_website', e) }} onClick={e => e.stopPropagation()} />
                     </th>
                   )}
                   {visCol('verified') && (
-                    <th style={thStyle('verified')}>
-                      Verified
-                      <span style={resizeHandleStyle} onMouseDown={e => startResize('verified', e)} />
+                    <th style={thStyle('verified')} onClick={() => handleSort('verified')}>
+                      Verified{sortInd('verified')}
+                      <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('verified', e) }} onClick={e => e.stopPropagation()} />
                     </th>
                   )}
                   {visCol('last_modified_by') && (
-                    <th style={thStyle('last_modified_by')}>
-                      Modified By
-                      <span style={resizeHandleStyle} onMouseDown={e => startResize('last_modified_by', e)} />
+                    <th style={thStyle('last_modified_by')} onClick={() => handleSort('last_modified_by')}>
+                      Modified By{sortInd('last_modified_by')}
+                      <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('last_modified_by', e) }} onClick={e => e.stopPropagation()} />
                     </th>
                   )}
                   {visCol('updated_at') && (
-                    <th style={thStyle('updated_at')}>
-                      Last Modified
-                      <span style={resizeHandleStyle} onMouseDown={e => startResize('updated_at', e)} />
+                    <th style={thStyle('updated_at')} onClick={() => handleSort('updated_at')}>
+                      Last Modified{sortInd('updated_at')}
+                      <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('updated_at', e) }} onClick={e => e.stopPropagation()} />
                     </th>
                   )}
-                  <th style={{ ...fmt.th, width: 80, padding: '12px 16px' }}>Actions</th>
+                  <th style={{ ...fmt.th, width: 80, padding: '12px 16px', cursor: 'default' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>

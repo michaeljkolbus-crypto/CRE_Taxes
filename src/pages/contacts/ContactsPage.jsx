@@ -51,8 +51,16 @@ export default function ContactsPage() {
   const { views, saveView, deleteView } = useViewPreferences('contacts_list')
   const { widths, startResize, resizeHandleStyle } = useResizableColumns(ALL_COLUMNS)
   const [groupDefs, setGroupDefs] = useState([])
+  const [sortField, setSortField] = useState('last_name')
+  const [sortAsc, setSortAsc] = useState(true)
 
-  useEffect(() => { fetchContacts() }, [page, pageSize, search])
+  const handleSort = (field) => {
+    if (sortField === field) setSortAsc(prev => !prev)
+    else { setSortField(field); setSortAsc(true) }
+    setPage(0)
+  }
+
+  useEffect(() => { fetchContacts() }, [page, pageSize, search, sortField, sortAsc])
 
   useEffect(() => {
     supabase
@@ -70,7 +78,7 @@ export default function ContactsPage() {
     if (search) {
       query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email_address.ilike.%${search}%,main_phone.ilike.%${search}%`)
     }
-    query = query.order('last_name', { ascending: true }).range(from, to)
+    query = query.order(sortField, { ascending: sortAsc }).range(from, to)
     const { data, count, error } = await query
     if (error) { console.error(error); setLoading(false); return }
     setContacts(data || []); setTotal(count || 0); setLoading(false)
@@ -153,8 +161,11 @@ export default function ContactsPage() {
     width: widths[key],
     minWidth: 60,
     userSelect: 'none',
+    cursor: 'pointer',
     ...extra,
   })
+
+  const sortInd = (field) => sortField === field ? (sortAsc ? ' ↑' : ' ↓') : ''
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -186,76 +197,76 @@ export default function ContactsPage() {
             <thead style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0 }}>
               <tr>
                 {visCol('full_name') && (
-                  <th style={{ ...thStyle('full_name'), textAlign: 'left' }}>
-                    Name <span style={resizeHandleStyle} onMouseDown={e => startResize('full_name', e)} />
+                  <th style={{ ...thStyle('full_name'), textAlign: 'left' }} onClick={() => handleSort('last_name')}>
+                    Name{sortInd('last_name')} <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('full_name', e) }} onClick={e => e.stopPropagation()} />
                   </th>
                 )}
                 {visCol('company_name') && (
-                  <th style={thStyle('company_name')}>
+                  <th style={{ ...thStyle('company_name'), cursor: 'default' }}>
                     Company <span style={resizeHandleStyle} onMouseDown={e => startResize('company_name', e)} />
                   </th>
                 )}
                 {visCol('main_phone') && (
-                  <th style={thStyle('main_phone')}>
-                    Phone <span style={resizeHandleStyle} onMouseDown={e => startResize('main_phone', e)} />
+                  <th style={thStyle('main_phone')} onClick={() => handleSort('main_phone')}>
+                    Phone{sortInd('main_phone')} <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('main_phone', e) }} onClick={e => e.stopPropagation()} />
                   </th>
                 )}
                 {visCol('email_address') && (
-                  <th style={thStyle('email_address')}>
-                    Email <span style={resizeHandleStyle} onMouseDown={e => startResize('email_address', e)} />
+                  <th style={thStyle('email_address')} onClick={() => handleSort('email_address')}>
+                    Email{sortInd('email_address')} <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('email_address', e) }} onClick={e => e.stopPropagation()} />
                   </th>
                 )}
                 {visCol('contact_type') && (
-                  <th style={thStyle('contact_type')}>
-                    Contact Type <span style={resizeHandleStyle} onMouseDown={e => startResize('contact_type', e)} />
+                  <th style={thStyle('contact_type')} onClick={() => handleSort('contact_type')}>
+                    Contact Type{sortInd('contact_type')} <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('contact_type', e) }} onClick={e => e.stopPropagation()} />
                   </th>
                 )}
                 {visCol('city') && (
-                  <th style={thStyle('city')}>
-                    City <span style={resizeHandleStyle} onMouseDown={e => startResize('city', e)} />
+                  <th style={thStyle('city')} onClick={() => handleSort('city')}>
+                    City{sortInd('city')} <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('city', e) }} onClick={e => e.stopPropagation()} />
                   </th>
                 )}
                 {visCol('title') && (
-                  <th style={thStyle('title')}>
-                    Title <span style={resizeHandleStyle} onMouseDown={e => startResize('title', e)} />
+                  <th style={thStyle('title')} onClick={() => handleSort('title')}>
+                    Title{sortInd('title')} <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('title', e) }} onClick={e => e.stopPropagation()} />
                   </th>
                 )}
                 {visCol('source') && (
-                  <th style={thStyle('source')}>
-                    Source <span style={resizeHandleStyle} onMouseDown={e => startResize('source', e)} />
+                  <th style={thStyle('source')} onClick={() => handleSort('source')}>
+                    Source{sortInd('source')} <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('source', e) }} onClick={e => e.stopPropagation()} />
                   </th>
                 )}
                 {visCol('contact_groups') && (
-                  <th style={thStyle('contact_groups')}>
+                  <th style={{ ...thStyle('contact_groups'), cursor: 'default' }}>
                     Groups <span style={resizeHandleStyle} onMouseDown={e => startResize('contact_groups', e)} />
                   </th>
                 )}
                 {visCol('segments') && (
-                  <th style={thStyle('segments')}>
+                  <th style={{ ...thStyle('segments'), cursor: 'default' }}>
                     Segments <span style={resizeHandleStyle} onMouseDown={e => startResize('segments', e)} />
                   </th>
                 )}
                 {visCol('linkedin_url') && (
-                  <th style={thStyle('linkedin_url')}>
+                  <th style={{ ...thStyle('linkedin_url'), cursor: 'default' }}>
                     LinkedIn <span style={resizeHandleStyle} onMouseDown={e => startResize('linkedin_url', e)} />
                   </th>
                 )}
                 {visCol('verified') && (
-                  <th style={thStyle('verified')}>
-                    Verified <span style={resizeHandleStyle} onMouseDown={e => startResize('verified', e)} />
+                  <th style={thStyle('verified')} onClick={() => handleSort('verified')}>
+                    Verified{sortInd('verified')} <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('verified', e) }} onClick={e => e.stopPropagation()} />
                   </th>
                 )}
                 {visCol('last_modified_by') && (
-                  <th style={thStyle('last_modified_by')}>
-                    Modified By <span style={resizeHandleStyle} onMouseDown={e => startResize('last_modified_by', e)} />
+                  <th style={thStyle('last_modified_by')} onClick={() => handleSort('last_modified_by')}>
+                    Modified By{sortInd('last_modified_by')} <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('last_modified_by', e) }} onClick={e => e.stopPropagation()} />
                   </th>
                 )}
                 {visCol('updated_at') && (
-                  <th style={thStyle('updated_at')}>
-                    Last Modified <span style={resizeHandleStyle} onMouseDown={e => startResize('updated_at', e)} />
+                  <th style={thStyle('updated_at')} onClick={() => handleSort('updated_at')}>
+                    Last Modified{sortInd('updated_at')} <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('updated_at', e) }} onClick={e => e.stopPropagation()} />
                   </th>
                 )}
-                <th style={{ ...fmt.th, width: 80, padding: '12px 16px' }}>Actions</th>
+                <th style={{ ...fmt.th, width: 80, padding: '12px 16px', cursor: 'default' }}>Actions</th>
               </tr>
             </thead>
             <tbody>

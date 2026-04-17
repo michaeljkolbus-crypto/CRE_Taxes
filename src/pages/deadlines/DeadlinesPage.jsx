@@ -178,6 +178,17 @@ export default function DeadlinesPage() {
   const [filterType,    setFilterType]    = useState('')
   const [filterStatus,  setFilterStatus]  = useState('')
 
+  // Sort
+  const [sortField, setSortField] = useState('close_date')
+  const [sortAsc,   setSortAsc]   = useState(true)
+
+  const handleSort = (field) => {
+    if (sortField === field) setSortAsc(prev => !prev)
+    else { setSortField(field); setSortAsc(true) }
+  }
+
+  const sortInd = (field) => sortField === field ? (sortAsc ? ' ↑' : ' ↓') : ''
+
   useEffect(() => { fetchDeadlines() }, [])
 
   const fetchDeadlines = async () => {
@@ -214,6 +225,15 @@ export default function DeadlinesPage() {
       if (filterStatus === 'soon'   && (daysUntil(d.close_date) > 30 || daysUntil(d.close_date) < 0)) return false
     }
     return true
+  })
+
+  // Sort filtered results client-side
+  const sortedFiltered = [...filtered].sort((a, b) => {
+    const av = a[sortField] ?? ''
+    const bv = b[sortField] ?? ''
+    if (av < bv) return sortAsc ? -1 : 1
+    if (av > bv) return sortAsc ? 1 : -1
+    return 0
   })
 
   // Unique years for filter dropdown
@@ -297,13 +317,30 @@ export default function DeadlinesPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                {['County', 'Type', 'Tax Year', 'Filing Opens', 'Filing Closes', 'Days Left', 'Status', 'Notes', ''].map(h => (
-                  <th key={h} style={{ padding: '11px 14px', textAlign: h === 'County' || h === 'Notes' || h === '' ? 'left' : 'center', fontWeight: 700, color: '#475569', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+                {[
+                  { label: 'County',        field: 'county',       align: 'left'   },
+                  { label: 'Type',          field: 'appeal_type',  align: 'center' },
+                  { label: 'Tax Year',      field: 'tax_year',     align: 'center' },
+                  { label: 'Filing Opens',  field: 'open_date',    align: 'center' },
+                  { label: 'Filing Closes', field: 'close_date',   align: 'center' },
+                  { label: 'Days Left',     field: null,           align: 'center' },
+                  { label: 'Status',        field: null,           align: 'center' },
+                  { label: 'Notes',         field: 'notes',        align: 'left'   },
+                  { label: '',              field: null,           align: 'left'   },
+                ].map(({ label, field }) => (
+                  <th key={label}
+                    onClick={field ? () => handleSort(field) : undefined}
+                    style={{ padding: '11px 14px', textAlign: label === 'County' || label === 'Notes' || label === '' ? 'left' : 'center', fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.04em', userSelect: 'none',
+                      color: field && sortField === field ? '#1e40af' : '#475569',
+                      cursor: field ? 'pointer' : 'default',
+                    }}>
+                    {label}{field ? sortInd(field) : ''}
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {filtered.map((d, idx) => {
+              {sortedFiltered.map((d, idx) => {
                 const days          = daysUntil(d.close_date)
                 const urgency       = urgencyBadge(days)
                 const status        = statusBadge(d.open_date, d.close_date)

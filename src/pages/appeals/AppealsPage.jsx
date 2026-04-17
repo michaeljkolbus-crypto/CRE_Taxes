@@ -58,8 +58,16 @@ export default function AppealsPage() {
 
   const { views, saveView, deleteView } = useViewPreferences('appeals_list')
   const { widths, startResize, resizeHandleStyle } = useResizableColumns(ALL_COLUMNS)
+  const [sortField, setSortField] = useState('created_at')
+  const [sortAsc, setSortAsc] = useState(false)
 
-  useEffect(() => { fetchStages(); fetchAppeals() }, [selectedStage, selectedYear, page, pageSize])
+  const handleSort = (field) => {
+    if (sortField === field) setSortAsc(prev => !prev)
+    else { setSortField(field); setSortAsc(true) }
+    setPage(0)
+  }
+
+  useEffect(() => { fetchStages(); fetchAppeals() }, [selectedStage, selectedYear, page, pageSize, sortField, sortAsc])
 
   const fetchStages = async () => {
     const { data } = await supabase.from('appeal_stages').select('*').order('sort_order', { ascending: true })
@@ -77,7 +85,7 @@ export default function AppealsPage() {
 
     const from = page * pageSize
     const to   = from + pageSize - 1
-    const { data, count: totalCount, error } = await query.order('created_at', { ascending: false }).range(from, to)
+    const { data, count: totalCount, error } = await query.order(sortField, { ascending: sortAsc }).range(from, to)
 
     if (error) console.error(error)
     else { setAppeals(data || []); setCount(totalCount || 0) }
@@ -133,8 +141,11 @@ export default function AppealsPage() {
     padding: 12, fontWeight: 600, color: '#1e293b',
     position: 'relative', userSelect: 'none',
     width: widths[key], minWidth: 60,
+    cursor: 'pointer',
     ...extra,
   })
+
+  const sortInd = (field) => sortField === field ? (sortAsc ? ' ↑' : ' ↓') : ''
 
   const stageBadge = (stage) => (
     <div style={{ display: 'inline-block', background: stage?.color || '#e2e8f0', color: '#fff', padding: '4px 8px', borderRadius: 4, fontSize: 12, fontWeight: 500 }}>
@@ -256,66 +267,66 @@ export default function AppealsPage() {
             <thead>
               <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                 {visCol('address') && (
-                  <th style={{ ...thStyle('address'), textAlign: 'left' }}>
+                  <th style={{ ...thStyle('address'), textAlign: 'left', cursor: 'default' }}>
                     Address <span style={resizeHandleStyle} onMouseDown={e => startResize('address', e)} />
                   </th>
                 )}
                 {visCol('county') && (
-                  <th style={{ ...thStyle('county'), textAlign: 'center' }}>
+                  <th style={{ ...thStyle('county'), textAlign: 'center', cursor: 'default' }}>
                     County <span style={resizeHandleStyle} onMouseDown={e => startResize('county', e)} />
                   </th>
                 )}
                 {visCol('tax_year') && (
-                  <th style={{ ...thStyle('tax_year'), textAlign: 'center' }}>
-                    Tax Year <span style={resizeHandleStyle} onMouseDown={e => startResize('tax_year', e)} />
+                  <th style={{ ...thStyle('tax_year'), textAlign: 'center' }} onClick={() => handleSort('tax_year')}>
+                    Tax Year{sortInd('tax_year')} <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('tax_year', e) }} onClick={e => e.stopPropagation()} />
                   </th>
                 )}
                 {visCol('stage') && (
-                  <th style={{ ...thStyle('stage'), textAlign: 'center' }}>
+                  <th style={{ ...thStyle('stage'), textAlign: 'center', cursor: 'default' }}>
                     Stage <span style={resizeHandleStyle} onMouseDown={e => startResize('stage', e)} />
                   </th>
                 )}
                 {visCol('bor_result') && (
-                  <th style={{ ...thStyle('bor_result'), textAlign: 'center' }}>
-                    BOR Result <span style={resizeHandleStyle} onMouseDown={e => startResize('bor_result', e)} />
+                  <th style={{ ...thStyle('bor_result'), textAlign: 'center' }} onClick={() => handleSort('bor_result')}>
+                    BOR Result{sortInd('bor_result')} <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('bor_result', e) }} onClick={e => e.stopPropagation()} />
                   </th>
                 )}
                 {visCol('ptab_result') && (
-                  <th style={{ ...thStyle('ptab_result'), textAlign: 'center' }}>
-                    PTAB Result <span style={resizeHandleStyle} onMouseDown={e => startResize('ptab_result', e)} />
+                  <th style={{ ...thStyle('ptab_result'), textAlign: 'center' }} onClick={() => handleSort('ptab_result')}>
+                    PTAB Result{sortInd('ptab_result')} <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('ptab_result', e) }} onClick={e => e.stopPropagation()} />
                   </th>
                 )}
                 {visCol('eav_reduction') && (
-                  <th style={{ ...thStyle('eav_reduction'), textAlign: 'center' }}>
+                  <th style={{ ...thStyle('eav_reduction'), textAlign: 'center', cursor: 'default' }}>
                     EAV Reduction <span style={resizeHandleStyle} onMouseDown={e => startResize('eav_reduction', e)} />
                   </th>
                 )}
                 {visCol('tax_savings') && (
-                  <th style={{ ...thStyle('tax_savings'), textAlign: 'center' }}>
+                  <th style={{ ...thStyle('tax_savings'), textAlign: 'center', cursor: 'default' }}>
                     Tax Savings <span style={resizeHandleStyle} onMouseDown={e => startResize('tax_savings', e)} />
                   </th>
                 )}
                 {visCol('commission') && (
-                  <th style={{ ...thStyle('commission'), textAlign: 'center' }}>
+                  <th style={{ ...thStyle('commission'), textAlign: 'center', cursor: 'default' }}>
                     Commission <span style={resizeHandleStyle} onMouseDown={e => startResize('commission', e)} />
                   </th>
                 )}
                 {visCol('verified') && (
-                  <th style={{ ...thStyle('verified'), textAlign: 'center' }}>
-                    Verified <span style={resizeHandleStyle} onMouseDown={e => startResize('verified', e)} />
+                  <th style={{ ...thStyle('verified'), textAlign: 'center' }} onClick={() => handleSort('verified')}>
+                    Verified{sortInd('verified')} <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('verified', e) }} onClick={e => e.stopPropagation()} />
                   </th>
                 )}
                 {visCol('last_modified_by') && (
-                  <th style={{ ...thStyle('last_modified_by'), textAlign: 'center' }}>
-                    Modified By <span style={resizeHandleStyle} onMouseDown={e => startResize('last_modified_by', e)} />
+                  <th style={{ ...thStyle('last_modified_by'), textAlign: 'center' }} onClick={() => handleSort('last_modified_by')}>
+                    Modified By{sortInd('last_modified_by')} <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('last_modified_by', e) }} onClick={e => e.stopPropagation()} />
                   </th>
                 )}
                 {visCol('updated_at') && (
-                  <th style={{ ...thStyle('updated_at'), textAlign: 'center' }}>
-                    Last Modified <span style={resizeHandleStyle} onMouseDown={e => startResize('updated_at', e)} />
+                  <th style={{ ...thStyle('updated_at'), textAlign: 'center' }} onClick={() => handleSort('updated_at')}>
+                    Last Modified{sortInd('updated_at')} <span style={resizeHandleStyle} onMouseDown={e => { e.stopPropagation(); startResize('updated_at', e) }} onClick={e => e.stopPropagation()} />
                   </th>
                 )}
-                <th style={{ padding: 12, textAlign: 'center', fontWeight: 600, color: '#1e293b', width: 80 }}>Actions</th>
+                <th style={{ padding: 12, textAlign: 'center', fontWeight: 600, color: '#1e293b', width: 80, cursor: 'default' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
