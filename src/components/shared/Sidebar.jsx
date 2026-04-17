@@ -82,6 +82,19 @@ const NAV_ITEMS = [
   },
 ]
 
+const CONFIGURE_ITEMS = [
+  {
+    path: '/groups',
+    label: 'Contact Groups',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/>
+        <line x1="7" y1="7" x2="7.01" y2="7"/>
+      </svg>
+    )
+  },
+]
+
 export default function Sidebar() {
   return (
     <aside style={{
@@ -99,6 +112,38 @@ export default function Sidebar() {
           Navigation
         </div>
         {NAV_ITEMS.map(item => (
+          <NavLink
+            key={item.path}
+            to={item.path}
+            style={({ isActive }) => ({
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '8px 12px',
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: isActive ? 600 : 500,
+              color: isActive ? '#fff' : '#94a3b8',
+              background: isActive ? 'rgba(59,130,246,0.2)' : 'transparent',
+              borderLeft: isActive ? '2px solid #3b82f6' : '2px solid transparent',
+              textDecoration: 'none',
+              transition: 'all 0.15s',
+            })}
+          >
+            {({ isActive }) => (
+              <>
+                <span style={{ opacity: isActive ? 1 : 0.6 }}>{item.icon}</span>
+                {item.label}
+              </>
+            )}
+          </NavLink>
+        ))}
+
+        {/* Configure section */}
+        <div style={{ padding: '20px 8px 10px 8px', fontSize: 10, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', borderTop: '1px solid rgba(255,255,255,0.06)', marginTop: 8 }}>
+          Configure
+        </div>
+        {CONFIGURE_ITEMS.map(item => (
           <NavLink
             key={item.path}
             to={item.path}

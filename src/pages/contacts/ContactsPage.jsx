@@ -6,6 +6,7 @@ import { fmt } from '../../lib/theme'
 import RecordToolbar from '../../components/shared/RecordToolbar'
 import { useViewPreferences } from '../../hooks/useViewPreferences'
 import { ExcelImporter } from '../../components/shared/ExcelImporter'
+import { hexToRgba } from '../../components/shared/TagInput'
 
 const PAGE_SIZE = 50
 
@@ -45,8 +46,17 @@ export default function ContactsPage() {
   })
 
   const { views, saveView, deleteView } = useViewPreferences('contacts_list')
+  const [groupDefs, setGroupDefs] = useState([])
 
   useEffect(() => { fetchContacts() }, [page, search])
+
+  useEffect(() => {
+    supabase
+      .from('contact_group_definitions')
+      .select('name, color')
+      .order('name')
+      .then(({ data }) => setGroupDefs(data || []))
+  }, [])
 
   const fetchContacts = async () => {
     setLoading(true)
@@ -192,8 +202,30 @@ export default function ContactsPage() {
                   {visCol('city')          && <td style={{ ...fmt.td, padding: '12px 16px' }}>{contact.city || '—'}</td>}
                   {visCol('title')         && <td style={{ ...fmt.td, padding: '12px 16px' }}>{contact.title || '—'}</td>}
                   {visCol('source')        && <td style={{ ...fmt.td, padding: '12px 16px' }}>{contact.source || '—'}</td>}
-                  {visCol('contact_groups') && <td style={{ ...fmt.td, padding: '12px 16px' }}>{(contact.contact_groups || []).join(', ') || '—'}</td>}
-                  {visCol('segments')      && <td style={{ ...fmt.td, padding: '12px 16px' }}>{(contact.segments || []).join(', ') || '—'}</td>}
+                  {visCol('contact_groups') && (
+                    <td style={{ ...fmt.td, padding: '10px 16px' }}>
+                      {(contact.contact_groups || []).length > 0 ? (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                          {(contact.contact_groups || []).map((tag, i) => {
+                            const def = groupDefs.find(g => g.name.toLowerCase() === tag.toLowerCase())
+                            const color = def?.color || '#64748b'
+                            return (
+                              <span key={i} style={{
+                                display: 'inline-flex', alignItems: 'center',
+                                padding: '1px 8px', borderRadius: 99,
+                                background: hexToRgba(color, 0.12), color,
+                                border: `1px solid ${hexToRgba(color, 0.3)}`,
+                                fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
+                              }}>
+                                #{tag}
+                              </span>
+                            )
+                          })}
+                        </div>
+                      ) : '—'}
+                    </td>
+                  )}
+                  {visCol('segments') && <td style={{ ...fmt.td, padding: '12px 16px' }}>{(contact.segments || []).join(', ') || '—'}</td>}
                   {visCol('linkedin_url')  && <td style={{ ...fmt.td, padding: '12px 16px' }}>
                     {contact.linkedin_url
                       ? <a href={contact.linkedin_url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ color: '#1e40af', fontSize: 12 }}>View</a>

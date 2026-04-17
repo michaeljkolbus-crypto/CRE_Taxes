@@ -15,6 +15,7 @@ import CompsPage from './pages/comps/CompsPage'
 import DeadlinesPage from './pages/deadlines/DeadlinesPage'
 import TasksPage from './pages/tasks/TasksPage'
 import SettingsPage from './pages/settings/SettingsPage'
+import GroupsManager from './pages/settings/GroupsManager'
 import UserProfilePage from './pages/profile/UserProfilePage'
 
 function PrivateRoute({ children }) {
@@ -58,6 +59,7 @@ function AppRoutes() {
       <Route path="/deadlines" element={<PrivateRoute><Layout><DeadlinesPage /></Layout></PrivateRoute>} />
       <Route path="/tasks" element={<PrivateRoute><Layout><TasksPage /></Layout></PrivateRoute>} />
       <Route path="/settings" element={<PrivateRoute><Layout><SettingsPage /></Layout></PrivateRoute>} />
+      <Route path="/groups" element={<PrivateRoute><Layout><GroupsManager /></Layout></PrivateRoute>} />
       <Route path="/profile" element={<PrivateRoute><Layout><UserProfilePage /></Layout></PrivateRoute>} />
     </Routes>
   )

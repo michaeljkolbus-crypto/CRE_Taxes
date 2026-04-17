@@ -4,6 +4,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { PhotoGallery } from '../../components/shared/PhotoGallery'
 import { useViewPreferences } from '../../hooks/useViewPreferences'
+import TagInput, { hexToRgba } from '../../components/shared/TagInput'
 
 // ── Shared helpers ─────────────────────────────────────────────────────────
 function ReadField({ label, value, href }) {
@@ -175,6 +176,8 @@ export default function ContactDetail() {
   const [form, setForm] = useState({})
   const [saving, setSaving] = useState(false)
   const [deleteError, setDeleteError] = useState(null)
+  const [groupDefs, setGroupDefs] = useState([])
+
   // Company typeahead
   const [companySearch, setCompanySearch] = useState('')
   const [companyResults, setCompanyResults] = useState([])
@@ -217,6 +220,14 @@ export default function ContactDetail() {
 
   useEffect(() => { fetchContact() }, [id])
 
+  useEffect(() => {
+    supabase
+      .from('contact_group_definitions')
+      .select('name, color')
+      .order('name')
+      .then(({ data }) => setGroupDefs(data || []))
+  }, [])
+
   const searchCompanies = async (q) => {
     if (!q.trim()) { setCompanyResults([]); return }
     const { data } = await supabase.from('companies')
@@ -236,7 +247,7 @@ export default function ContactDetail() {
     setContact(contactData)
     setForm({
       ...contactData,
-      contact_groups: (contactData.contact_groups || []).join(', '),
+      contact_groups: contactData.contact_groups || [],
       segments: (contactData.segments || []).join(', '),
     })
 
@@ -254,9 +265,7 @@ export default function ContactDetail() {
     delete updateData.full_name
     delete updateData.created_at
     delete updateData.company   // strip joined relation before upsert
-    updateData.contact_groups = form.contact_groups
-      ? form.contact_groups.split(',').map(s => s.trim()).filter(Boolean)
-      : []
+    updateData.contact_groups = Array.isArray(form.contact_groups) ? form.contact_groups : []
     updateData.segments = form.segments
       ? form.segments.split(',').map(s => s.trim()).filter(Boolean)
       : []
@@ -268,6 +277,16 @@ export default function ContactDetail() {
     setContact({ ...contact, ...updateData })
     setEditing(false)
     setSaving(false)
+  }
+
+  // Called by TagInput when user creates a brand-new group tag not in the catalog
+  const handleAddGroupDef = async (name) => {
+    const { data } = await supabase
+      .from('contact_group_definitions')
+      .insert({ name })
+      .select('name, color')
+      .single()
+    if (data) setGroupDefs(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)))
   }
 
   const handleDelete = async () => {
@@ -506,8 +525,14 @@ export default function ContactDetail() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
               <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 20px' }}>
                 <SH title="Classification" />
-                <EditField label="Contact Group(s) — comma separated" value={form.contact_groups} onChange={v => f('contact_groups', v)} />
-                <EditField label="Segment(s) — comma separated"       value={form.segments}       onChange={v => f('segments', v)} />
+                <TagInput
+                  label="Contact Group(s)"
+                  value={form.contact_groups}
+                  onChange={v => f('contact_groups', v)}
+                  groups={groupDefs}
+                  onAddGroup={handleAddGroupDef}
+                />
+                <EditField label="Segment(s) — comma separated" value={form.segments} onChange={v => f('segments', v)} />
                 <EditField label="Source" value={form.source} type="select" options={SOURCE_OPTIONS} onChange={v => f('source', v)} />
               </div>
               <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 20px' }}>
@@ -604,8 +629,31 @@ export default function ContactDetail() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
                   <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 20px' }}>
                     <SH title="Classification" />
-                    <ReadField label="Contact Group(s)" value={(contact.contact_groups || []).join(', ')} />
-                    <ReadField label="Segment(s)"       value={(contact.segments || []).join(', ')} />
+                    <div style={{ padding: '8px 0', borderBottom: '1px solid #f1f5f9' }}>
+                      <p style={{ margin: '0 0 6px', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Contact Group(s)</p>
+                      {(contact.contact_groups || []).length > 0 ? (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                          {(contact.contact_groups || []).map((tag, i) => {
+                            const groupDef = groupDefs.find(g => g.name.toLowerCase() === tag.toLowerCase())
+                            const color = groupDef?.color || '#64748b'
+                            return (
+                              <span key={i} style={{
+                                display: 'inline-flex', alignItems: 'center',
+                                padding: '2px 10px', borderRadius: 99,
+                                background: hexToRgba(color, 0.12), color,
+                                border: `1px solid ${hexToRgba(color, 0.3)}`,
+                                fontSize: 12, fontWeight: 600,
+                              }}>
+                                #{tag}
+                              </span>
+                            )
+                          })}
+                        </div>
+                      ) : (
+                        <p style={{ margin: 0, fontSize: 13, color: '#cbd5e1' }}>—</p>
+                      )}
+                    </div>
+                    <ReadField label="Segment(s)" value={(contact.segments || []).join(', ')} />
                     <ReadField label="Source"           value={contact.source} />
                   </div>
                   <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 20px' }}>
